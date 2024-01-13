@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace SpaceContest;
 
-class Card
+public class Card
 {
 	public int Id { get; set; }
 	public string Name { get; set; }
@@ -35,11 +35,11 @@ public Card(string line)
 		Reward = lineData[7];
 
 		CardText = 
-			 $"  _________________________\r\n"+
-			 $" /                         \\\r\n"+
-			 $"/    {Name}    ♥{CardCost}    \\\r\n"+
+			 $"  _________________________  \r\n"+
+			 $" /                         \\ \r\n"+
+			 $"/    {Name}    H{CardCost}   \\\r\n"+
 			 $"|                           |\r\n"+
-			 $"|    ■  [{ResourceValue}]     [{Faction}]   |\r\n"+
+			 $"|    R  [{ResourceValue}]     [{Faction}]   |\r\n"+
 			 $"|    χ  [{AttackValue}]                 |\r\n"+
 			 $"|    ϴ  [{ForceValue}]                 |\r\n"+
 			 $"|                           |\r\n"+
@@ -59,7 +59,7 @@ public Card(string line)
 			 $"|   7777777777777777777777  |\r\n"+
 			 $"|   7777777777777777777777  |\r\n"+
 			 $"\\                           /\r\n"+
-			 $" \\_________________________/";
+			 $" \\_________________________/ ";
 	}
 
 	public override string ToString()

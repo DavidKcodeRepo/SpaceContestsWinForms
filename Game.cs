@@ -12,11 +12,10 @@ namespace SpaceContest;
 
 
 /// <summary>
-/// The game keeps track of the states of the decks of cards, 
-/// hands and discard piles, and also calls actions to change these according to the player
+/// The game keeps track of the states of the decks of cards, hands and discard piles, and manages shuffles.
+/// The game is the primary class that calls action from the player and updates the state of the game to the console.
 /// </summary>
-/// 
-class Game
+public class Game
 {
 	private ConsoleView consoleview;
 
@@ -30,13 +29,19 @@ class Game
 
 	List<Card> PlayerDeck { get; set; } = new List<Card>();
 	List<Card> PlayerHand { get; set; } = new List<Card>();
+	List<Card> PlayerShownCards { get; set; } = new List<Card>();
 	List<Card> PlayerDiscardPile { get; set; } = new List<Card>();
+	
+	int PlayerResourceAvailable = 0;
+	int PlayerAttackAvailable = 0;
+	int ForceBalance = 4;
+
 
 	List<Card> OpponentDeck { get; set; } = new List<Card>();
 	List<Card> OpponenetHand { get; set; } = new List<Card>();
 	List<Card> OpponentDiscardPile { get; set; } = new List<Card>();
 
-	List<string> CommandStrings = new List<string>(Enum.GetNames(typeof(Commands)));
+	List<string> CommandStrings = new List<string>(Enum.GetNames(typeof(PlayerCommand)));
 
 	int PlayerHandLength = 5;
 	int ShopHandLength = 6;
@@ -68,7 +73,6 @@ class Game
 			string line = sourceData[i];
 			Card newCard = new Card(line);
 			GameDeck.Add(newCard);
-
 		}
 
 		consoleview.WriteLine("Dealing cards to starting positions...");
@@ -100,9 +104,9 @@ class Game
 			ShopHand.Add(GameDeck.First());
 			GameDeck.Remove(GameDeck.First());
 		}
-		consoleview.WriteLine(" -> Write 'help' for a list of commands");
+		consoleview.WriteLine("Hint: write 'help' for a list of commands");
+
 		consoleview.WriteLine(" Player 1, it's your turn!");
-		consoleview.WriteLine("What is your next move?");
 	}
 	#endregion
 
@@ -112,37 +116,59 @@ class Game
 
 	public void DoGameLoop(string userInput)
 	{
+		
+		consoleview.WriteLine("What is your next move?");
+		consoleview.WriteLine("--> ");
+
 		if (gameOver == true) { GameOver(); return; }
+		
+		string[] userInputParts = userInput.Split(' ');
 
-		switch (userInput)
+		switch (userInputParts[0])
 		{
-			case "help":
-				consoleview.WriteLine(" getting help...");
+			//case "help":
+			//	consoleview.WriteLine(" getting help...");
 
-				ShowHelp();
+			//	ShowHelp();
+			//	break;
+			//case "attackEnemy":
+			//	consoleview.WriteLine("Which card number would you like to attack the enemy?");
+			//	int cardSlot = int.Parse(Console.ReadLine());
+			//	//Console.WriteLine("you attack the enemy!");
+			//	Attack(cardSlot);
+			//	break;
+			//case "goAllIn":
+			//	//Console.WriteLine("You are going all in");
+			//	AllIn();
+			//	break;
+			case "showCard":
+				if (int.TryParse(userInputParts[1], out int cardToShow))
+				{
+					ShowCard(cardToShow);
+				}
+				else { consoleview.WriteLine("\nI didn't understand. To show a Card from shop write \"showCard [int]\" "); }
 				break;
-			case "attackEnemy":
-				consoleview.WriteLine("Which card number would you like to attack the enemy?");
-				int cardSlot = int.Parse(Console.ReadLine());
-				//Console.WriteLine("you attack the enemy!");
-				Attack(cardSlot);
-				break;
-			case "goAllIn":
-				//Console.WriteLine("You are going all in");
-				AllIn();
+			case "peekShownCards":
+				ShowHand(PlayerShownCards);
 				break;
 			case "peekHand":
-				Peek(PlayerHand);
+				ShowHand(PlayerHand);
 				break;
 			case "peekShop":
-				Peek(ShopHand);
+				ShowHand(ShopHand);
+				break;
+			case "peekDiscards":
+				ShowHand(PlayerDiscardPile);
 				break;
 			case "buyCard":
-				//Console.WriteLine("Which card number would you like to buy?");
-				int shopCardSlot = int.Parse(Console.ReadLine());
-				//Console.WriteLine("Which of your cards are you paying in for this?");
-				int playerCardSlot = int.Parse(Console.ReadLine());
-				BuyCard(shopCardSlot, playerCardSlot);
+				if(userInputParts.Length == 2)
+				{
+					if (int.TryParse(userInputParts[1], out int cardToBuy))
+					{
+						BuyCard(cardToBuy);
+					}
+					else { consoleview.WriteLine("\nI didn't understand. To buy a Card from shop write \"buyCard [int]\" "); }
+				};
 				break;
 			default:
 				//Console.WriteLine("I don't know that command");
@@ -150,94 +176,119 @@ class Game
 		}
 	}
 
+	private void ShowCard(int cardIndex)
+	{
+		if (cardIndex > 0 && cardIndex <= PlayerHand.Count )
+		{
+			Card card = PlayerHand[cardIndex - 1];
+
+			//update player scores
+			PlayerShownCards.Add(card);
+			PlayerResourceAvailable += card.ResourceValue;
+			//TODO implement subtleties of attack
+			PlayerAttackAvailable += card.AttackValue;
+			//TODO implement subtleties of force
+			ForceChange(card.ForceValue);
+			PlayerHand.RemoveAt(cardIndex);
+			consoleview.WriteLine($"\n You showed the {card.Name}. You now have {PlayerResourceAvailable} resources!");
+
+		}
+		else
+		{
+			consoleview.WriteLine($"\n You don't have that card. You have {PlayerHand.Count} cards");
+			return;
+		}
+	}
+
 	void GameOver()
 	{
-		throw new NotImplementedException(message: "game over not implemented; how did you get here!");
+		throw new NotImplementedException(message: "game over not implemented; how did you even get here!");
 	}
 
 
 	#endregion
 
+	void ForceChange(int delta)
+	{
+		ForceBalance += delta;
+		Math.Clamp(ForceBalance, -2, 2);
+	}
 
 	#region playerCommands
-
-	public enum Commands
-	{
-		attackEnemy,
-		drawCard,
-		peekHand,
-		peekShop,
-		buyCard,
-		help,
-		goAllIn
-
-		//DiscardCard,
-		//Purchase (shopcard),
-		//Discard (handcard),
-		//Reward (shopcard),
-		//UserAbiltiy(handcard),
-		//TargetBase(),
-		//ChooseNewBase(),
-		//ShuffleDeck(),
-		//FishDiscard(),
-		//CountEnemyCards(),
-		//PeekShop(),
-
-	}
 
 	void Attack(int cardSlot)
 	{
 		throw new NotImplementedException(message: "attack not implemented yet");
 	}
 
-	void BuyCard(int shopCardSlot, int playerCardSlot)
+	void BuyCard(int indexToBuy)
 	{
-		if (ShopHand[shopCardSlot].CardCost <= PlayerHand[playerCardSlot].CardCost)
+		if (indexToBuy > 0 && indexToBuy <= ShopHand.Count)
 		{
-			Card drawnCard = ShopHand[shopCardSlot];
-			ShopHand.RemoveAt(shopCardSlot);
-			PlayerHand.Add(drawnCard);
-			// fix this
-			return;
-		}
-		else
-		{
-			//Console.WriteLine("You can't afford this card!");
-			return;
+			Card cardtoBuy = ShopHand[indexToBuy - 1];
+			if (cardtoBuy.CardCost <= PlayerResourceAvailable)
+			{
+				ShopHand.RemoveAt(indexToBuy - 1);
+				PlayerDiscardPile.Add(cardtoBuy);
+				consoleview.WriteLine($"You bought {cardtoBuy.Name} for {cardtoBuy.CardCost}. The card is in your discard pile. \n");
+				PlayerResourceAvailable -= cardtoBuy.CardCost;
+				consoleview.WriteLine($"You have {PlayerResourceAvailable} resource remaining.\n");
+
+				ShopHand.Insert(indexToBuy - 1, GameDeck.First());
+				GameDeck.Remove(GameDeck.First());
+				consoleview.WriteLine($"A new card was added to the shop!\n");
+
+				return;
+			}
+			else
+			{
+				consoleview.WriteLine($"You can't afford this card! You have {PlayerResourceAvailable} resource; this card costs {cardtoBuy.CardCost} resource");
+				return;
+			} 
 		}
 	}
 
 	void ShowHand(List<Card> hand)
 	{
+		int totalAttack = 0;
+		int totalResource = 0;
+
+		foreach (Card card in hand)
+		{
+			totalAttack += card.AttackValue;
+			totalResource += card.ResourceValue;
+		}
+
+		//TODO - make this reflect shop or playerhand
+		consoleview.WriteLine($"\n");
+		//consoleview.WriteLine($"\n You have {hand.Count} cards in your hand. They conceal attack value of {totalAttack} and a resourcevalue of {totalResource}");
 		int cardNo = 0;
 		int lineNo = 0;
+		List<string> lines = new List<string>();
+
 		foreach (Card card in hand)
 		{
 			using (StringReader reader = new StringReader(card.ToString()))
 			{
 				string line = string.Empty;
-				do
+
+				while (line != null)
 				{
 					line = reader.ReadLine();
-					if (line != null)
+
+					if (lineNo < lines.Count)
 					{
-						//Console.SetCursorPosition(cardNo * 30, lineNo);
-						//Console.Write(line);
+						lines[lineNo] += "   " + line;
 						lineNo++;
 					}
-
-				} while (line != null);
+					else { lines.Add(line); lineNo++; }
+				}
 			}
 			lineNo = 0;
 			cardNo++;
 		}
-		//Console.WriteLine("");
-	}
 
-	void Peek(List<Card> hand)
-	{
-		//Console.WriteLine($"This hand has {hand.Count} cards.");
-		ShowHand(hand);
+		foreach (string line in lines) { consoleview.WriteLine(line); }
 	}
 
 	void ShowHelp()
@@ -253,4 +304,6 @@ class Game
 		throw new Exception(message: "All in is not implemented yet");
 	}
 	#endregion
+
+
 }

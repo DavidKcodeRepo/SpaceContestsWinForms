@@ -44,7 +44,7 @@ namespace SpaceContestsWinForms
 		private string GetLastLine(string text)
 		{
 			string[] lines = text.Split('\n');
-			return lines.Length > 0 ? lines[lines.Length - 2].Trim() : "";
+			return lines.Length > 0 ? lines[lines.Length - 1].Trim() : "";
 		}
 
 		private void ConsoleView_Shown(object? sender, EventArgs e)

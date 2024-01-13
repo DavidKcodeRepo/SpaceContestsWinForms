@@ -36,7 +36,7 @@
 			rtbConsole.BackColor = SystemColors.WindowFrame;
 			rtbConsole.Location = new Point(12, 12);
 			rtbConsole.Name = "rtbConsole";
-			rtbConsole.Size = new Size(1392, 637);
+			rtbConsole.Size = new Size(1740, 811);
 			rtbConsole.TabIndex = 0;
 			rtbConsole.Text = "";
 			// 
@@ -45,7 +45,7 @@
 			AutoScaleDimensions = new SizeF(7F, 14F);
 			AutoScaleMode = AutoScaleMode.Font;
 			BackColor = SystemColors.ControlDarkDark;
-			ClientSize = new Size(1416, 661);
+			ClientSize = new Size(1764, 835);
 			Controls.Add(rtbConsole);
 			Font = new Font("Courier New", 6.75F, FontStyle.Regular, GraphicsUnit.Point);
 			Margin = new Padding(2);
