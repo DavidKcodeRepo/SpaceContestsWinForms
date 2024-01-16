@@ -22,6 +22,8 @@ public class Player
 	//public List<Card> CaptialShips { get; set; }
 
 	public int BaseHitPoints { get; set; }
+
+	public BaseCard Base { get;set; }
 	public bool IsBaseAbilityAvailable { get; set; }
 	public List<bool> IsHandShown { get; set; }
 

@@ -142,11 +142,14 @@ public class Game
 			//	AllIn();
 			//	break;
 			case "showCard":
-				if (int.TryParse(userInputParts[1], out int cardToShow))
+				for (int i = 1; i < userInputParts.Length; i++) 
 				{
-					ShowCard(cardToShow);
+					if (int.TryParse(userInputParts[i], out int cardToShow))
+					{
+						ShowCard(cardToShow);
+					}
+					else { consoleview.WriteLine("\nI didn't understand. To show a Card from shop write \"showCard [int]\" or \"showCard [int] [int]...\" "); }
 				}
-				else { consoleview.WriteLine("\nI didn't understand. To show a Card from shop write \"showCard [int]\" "); }
 				break;
 			case "peekShownCards":
 				ShowHand(PlayerShownCards);
