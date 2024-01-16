@@ -14,7 +14,6 @@ The following
 ## Implementation
 
  - SpaceContests was originally intended to be a purely console application implementation, but it has become a winforms application to avoid heavy reconfiguration of the windows console to suit the needs of the game.
- - The tech 
  - The code is structured as per classes in the following diagram.
 ```mermaid
 sequenceDiagram
@@ -50,5 +49,5 @@ This app is not written with any affiliations and is intended as an educational 
 
 > Written with [StackEdit](https://stackedit.io/).
 <!--stackedit_data:
-eyJoaXN0b3J5IjpbMTY1OTYxOTgzMCwtMTQ5OTA5NjEwNV19
+eyJoaXN0b3J5IjpbMTExMTUwNzE4NCwtMTQ5OTA5NjEwNV19
 -->
