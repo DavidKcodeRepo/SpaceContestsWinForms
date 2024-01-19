@@ -18,7 +18,6 @@ namespace SpaceContestsWinForms
 
 		public ConsoleView()
 		{
-
 			InitializeComponent();
 			_game = new Game(this);
 			this.Shown += ConsoleView_Shown;

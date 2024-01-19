@@ -11,7 +11,6 @@ public class Card
 {
 	public int Id { get; set; }
 	public string Name { get; set; }
-
 	public Faction Faction {get;set;}
 	public int CardCost { get; set; }
 	public int ResourceValue { get; set; }
@@ -22,7 +21,6 @@ public class Card
 	public string Reward { get; set; }
 	public string ShownCardText { get; set; }
 	public string HiddenCardText { get; set; }
-
 
 	public bool IsShown { get; set; }
 

@@ -6,6 +6,7 @@ using SpaceContest;
 using System.Runtime.InteropServices.Marshalling;
 using System.Drawing.Printing;
 using SpaceContestsWinForms;
+using System.Numerics;
 
 namespace SpaceContest;
 
@@ -17,45 +18,44 @@ namespace SpaceContest;
 /// </summary>
 public class Game
 {
-	private ConsoleView consoleview;
+	private ConsoleView _consoleview;
+	private Player _player;
 
 	#region setup
 
 	///Card decks
-	List<Card> GameDeck { get; set; } = new List<Card>();
-	List<Card> GameDiscardPile { get; set; } = new List<Card>();
+	List<Card> ShopDeck { get; set; } = new List<Card>();
+	List<Card> ShopDiscardPile { get; set; } = new List<Card>();
 	List<Card> ShopHand { get; set; } = new List<Card>();
 	List<Card> RimBoyDeck { get; set; } = new List<Card>();
 
-	List<Card> PlayerDeck { get; set; } = new List<Card>();
-	List<Card> PlayerHand { get; set; } = new List<Card>();
-	List<Card> PlayerShownCards { get; set; } = new List<Card>();
-	List<Card> PlayerDiscardPile { get; set; } = new List<Card>();
 	
-	int PlayerResourceAvailable = 5;
-	int PlayerAttackAvailable = 0;
 	int ForceBalance = 4;
 	int OpponenetBaseHitPoints = 8;
 
-	public Faction PlayerFaction = Faction.Rebel; // TODO - remove when player.cs is active
 	public Faction OpponentFaction;
 	public bool IsPlayerTurn = true;
 
+	//TODO - refactor opponent into a class that extends player.
 	List<Card> OpponentDeck { get; set; } = new List<Card>();
-	List<Card> OpponenetHand { get; set; } = new List<Card>();
+	List<Card> OpponentHand { get; set; } = new List<Card>();
 	List<Card> OpponentDiscardPile { get; set; } = new List<Card>();
 
 	List<string> CommandStrings = new List<string>(Enum.GetNames(typeof(PlayerCommand)));
 
-	int PlayerHandLength = 5;
-	int ShopHandLength = 6;
+	/// <summary>
+	/// settings
+	/// </summary>
+	int GameHandCount = 5;
+	int ShopHandCount = 6;
 
 	/// <summary>
 	/// Constructor to build the game
 	/// </summary>
 	public Game(ConsoleView consoleView)
 	{
-		this.consoleview = consoleView;
+		this._consoleview = consoleView;
+		_player = new Player(_consoleview);
 	}
 
 	public void GameStartup()
@@ -63,12 +63,12 @@ public class Game
 		//Creates the decks of cards to GameDeck, PlayerDeck & OpponentDeck
 		// & Deals first hand to ShopHand, playerHand, and OpponentHand
 
-		consoleview.WriteLine("Let's play Star Cards!");
+		_consoleview.WriteLine("Let's play Star Cards!");
 		//Console.WriteLine("this line");
 
 		//(("Let's play some space contests"));
-		consoleview.WriteLine("______________");
-		consoleview.WriteLine("Getting the deck out the box...");
+		_consoleview.WriteLine("______________");
+		_consoleview.WriteLine("Getting the deck out the box...");
 		string sourceFile = GlobalConfig.CardData.FullFilePath();
 		List<string> sourceData = sourceFile.LoadFile();
 
@@ -76,53 +76,60 @@ public class Game
 		{
 			string line = sourceData[i];
 			Card newCard = new Card(line);
-			GameDeck.Add(newCard);
+			ShopDeck.Add(newCard);
 		}
 
-		consoleview.WriteLine("Dealing cards to starting positions...");
-		OpponentDeck.AddRange((GameDeck.GetRange(0, 10)));
-		PlayerDeck.AddRange((GameDeck.GetRange(10, 10)));
-		RimBoyDeck.AddRange((GameDeck.GetRange(20, 10)));
+		_consoleview.WriteLine("Dealing cards to starting positions...");
+		OpponentDeck.AddRange((ShopDeck.GetRange(0, 10)));
+		_player.Deck.AddRange((ShopDeck.GetRange(10, 10)));
+		RimBoyDeck.AddRange((ShopDeck.GetRange(20, 10)));
 
-		GameDeck.RemoveRange(0, 30);
+		ShopDeck.RemoveRange(0, 30);
 
-		consoleview.WriteLine("Shuffling the galaxy, player and opponent decks...");
+		//set up factions
+		_player.Faction = Faction.Rebel;
+		if (_player.Faction == Faction.Rebel) { OpponentFaction = Faction.Empire; }
+		if (_player.Faction == Faction.Empire) { OpponentFaction = Faction.Rebel; }
+
+		//deal starter cards
+		_consoleview.WriteLine("Shuffling the galaxy, player and opponent decks...");
 		OpponentDeck = OpponentDeck.OrderBy(x => Random.Shared.Next()).ToList();
-		PlayerDeck = PlayerDeck.OrderBy(x => Random.Shared.Next()).ToList();
-		GameDeck = GameDeck.OrderBy(x => Random.Shared.Next()).ToList();
+		_player.Deck = _player.Deck.OrderBy(x => Random.Shared.Next()).ToList();
+		ShopDeck = ShopDeck.OrderBy(x => Random.Shared.Next()).ToList();
 
-		consoleview.WriteLine("Dealing hand to player and opponent...");
+		_consoleview.WriteLine("Dealing hand to player and opponent...");
 
-		for (int i = 0; i < PlayerHandLength; i++)
+		//TODO - make choosing empire team an available choice
+
+
+
+		//give out starter hands
+		for (int i = 0; i < GameHandCount; i++)
 		{
-			PlayerDeck.First().IsShown = false;
-			PlayerHand.Add(PlayerDeck.First());
-			PlayerDeck.Remove(PlayerDeck.First());
+			_player.Deck.First().IsShown = false;
+			_player.Hand.Add(_player.Deck.First());
+			_player.Deck.Remove(_player.Deck.First());
 
 			OpponentDeck.First().IsShown = false;
-			OpponenetHand.Add(OpponentDeck.First());
+			OpponentHand.Add(OpponentDeck.First());
 			OpponentDeck.Remove(OpponentDeck.First());
 		}
 
-		consoleview.WriteLine("Dealing cards to the shop!...");
-		for (int i = 0; i < ShopHandLength; i++)
+		_consoleview.WriteLine("Dealing cards to the shop!...");
+		for (int i = 0; i < ShopHandCount; i++)
 		{
-			ShopHand.Add(GameDeck.First());
-			GameDeck.Remove(GameDeck.First());
+			ShopHand.Add(ShopDeck.First());
+			ShopDeck.Remove(ShopDeck.First());
 		}
-		consoleview.WriteLine("Hint: write 'help' for a list of commands");
+		_consoleview.WriteLine("Hint: write 'help' for a list of commands");
 
-		consoleview.WriteLine(" Player 1, it's your turn!");
-		AssignOpponentFaction(PlayerFaction);
+		_consoleview.WriteLine(" Player 1, it's your turn!");
+
+
+		
+		//start first round		
 		IsPlayerTurn = true;
-		consoleview.PromptPlayerForMove();
-	}
-
-	private void AssignOpponentFaction(Faction playerFaction)
-	{
-		if (playerFaction == Faction.Rebel) { OpponentFaction = Faction.Empire; }
-		if (playerFaction == Faction.Empire) { OpponentFaction = Faction.Rebel; }
-		return;
+		_consoleview.PromptPlayerForMove();
 	}
 	#endregion
 	#region gameLoop
@@ -131,8 +138,8 @@ public class Game
 
 	public void DoGameRound()
 	{
-		DiscardHand();
-		DrawNewHand();
+		_player.DiscardHand();
+		_player.DrawNewHand();
 		IsPlayerTurn = false;
 		DoOpponentTurn();
 		IsPlayerTurn = true;
@@ -142,17 +149,17 @@ public class Game
 	private void DoOpponentTurn()
 	{
 		//TODO - make the opponent do something...
-		consoleview.WriteLine("The opponent is thinking!...");
-		consoleview.WriteLine("but they don't really know how to play yet...");
-		consoleview.WriteLine("The opponent ends turn");
-		consoleview.PromptPlayerForMove();
+		_consoleview.WriteLine("The opponent is thinking!...");
+		_consoleview.WriteLine("but they don't really know how to play yet...");
+		_consoleview.WriteLine("The opponent ends turn");
+		_consoleview.PromptPlayerForMove();
 
 		return;
 	}
 
 	public void DoPlayerGameMove(string userInput)
 	{
-		consoleview.WriteLine("\n");
+		_consoleview.WriteLine("\n");
 
 		if (IsGameOver == true) { GameOver(); return; }
 		
@@ -183,17 +190,17 @@ public class Game
 					{
 						ShowCard(cardToShow - 1);
 					}
-					else { consoleview.WriteLine("\nI didn't understand. To show a Card from shop write \"showCard [int]\" or \"showCard [int] [int]...\" "); }
+					else { _consoleview.WriteLine("\nI didn't understand. To show a Card from shop write \"showCard [int]\" or \"showCard [int] [int]...\" "); }
 				}
 				break;
 			case "peekHand":
-				DisplayCards(PlayerHand);
+				DisplayCards(_player.Hand);
 				break;
 			case "peekShop":
 				DisplayCards(ShopHand);
 				break;
 			case "peekDiscards":
-				DisplayCards(PlayerDiscardPile);
+				DisplayCards(_player.DiscardPile);
 				break;
 			case "whereIsForce":
 				ReportForce();
@@ -205,17 +212,17 @@ public class Game
 					{
 						BuyCard(cardToBuy);
 					}
-					else { consoleview.WriteLine("\nI didn't understand. To buy a Card from shop write \"buyCard [int]\" "); }
+					else { _consoleview.WriteLine("\nI didn't understand. To buy a Card from shop write \"buyCard [int]\" "); }
 				};
 				break;
 			case "endTurn":
-				consoleview.WriteLine("You end your turn");
+				_consoleview.WriteLine("You end your turn");
 				DoGameRound();
 				break;
 			case "attackBase":
 				if (userInputParts.Length < 2)
 				{
-					consoleview.WriteLine("\nI didn't understand. To attack the enemy base write \"attack Base [int]\" or \"attackBase [int] [int]...\" ");
+					_consoleview.WriteLine("\nI didn't understand. To attack the enemy base write \"attack Base [int]\" or \"attackBase [int] [int]...\" ");
 				}
 				for (int i = 1; i < userInputParts.Length; i++)
 				{
@@ -223,7 +230,7 @@ public class Game
 					{
 						AttackBase(cardToFight - 1);
 					}
-					else { consoleview.WriteLine("\nI didn't understand. To attack the enemy base write \"attack Base [int]\" or \"attackBase [int] [int]...\" "); }
+					else { _consoleview.WriteLine("\nI didn't understand. To attack the enemy base write \"attack Base [int]\" or \"attackBase [int] [int]...\" "); }
 				}
 				break;
 			default:
@@ -244,41 +251,40 @@ public class Game
 
 	private void ShowCard(int cardIndex)
 	{
-		Card card = PlayerHand[cardIndex];
+		Card card = _player.Hand[cardIndex];
 
 		if (card.IsShown == true)
 		{
-			consoleview.WriteLine($"The {card.Name} is already shown!");
+			_consoleview.WriteLine($"The {card.Name} is already shown!");
 			return;
 		}
-		if (!(cardIndex >= 0 && cardIndex < PlayerHand.Count))
+		if (!(cardIndex >= 0 && cardIndex < _player.Hand.Count))
 		{
-			consoleview.WriteLine($"\n You don't have that card. You have {PlayerHand.Count} cards");
+			_consoleview.WriteLine($"\n You don't have that card. You have {_player.Hand.Count} cards");
 			return;
 		}
 
 		//update player resources
 		if (card.ResourceValue > 0)
 		{
-			PlayerResourceAvailable += card.ResourceValue;
-			consoleview.WriteLine($"{card.Name} gained {card.ResourceValue} for the {PlayerFaction} team. "
-			+ $"\nYou now have {PlayerResourceAvailable} resources!");
+			_player.ResourceAvailable += card.ResourceValue;
+			_consoleview.WriteLine($"{card.Name} gained {card.ResourceValue} for the {_player.Faction} team. "
+			+ $"\nYou now have {_player.ResourceAvailable} resources!");
 		}
 		//update force
 		if (card.ForceValue > 0)
 		{
 			ForceChange(card.ForceValue);
-			consoleview.WriteLine($"{card.Name} gained {card.ForceValue} for the {PlayerFaction} team. ");
+			_consoleview.WriteLine($"{card.Name} gained {card.ForceValue} for the {_player.Faction} team. ");
 			ReportForce();
 		}
 		//update attack
 		if (card.AttackValue > 0)
 		{
-			PlayerAttackAvailable += card.AttackValue;
-			consoleview.WriteLine($"{card.Name} is ready to fight! They can attack with {card.AttackValue} strength."
-				+ $"\nYour team has {PlayerAttackAvailable} total attack strength.");
+			_player.AttackAvailable += card.AttackValue;
+			_consoleview.WriteLine($"{card.Name} is ready to fight! They can attack with {card.AttackValue} strength."
+				+ $"\nYour team has {_player.AttackAvailable} total attack strength.");
 		}
-		PlayerAttackAvailable += card.AttackValue;
 
 		card.IsShown = true;
 		return;
@@ -296,26 +302,27 @@ public class Game
 
 			if ( cardtoBuy.Faction == OpponentFaction)
 			{
-				consoleview.WriteLine("This card is from the opponents faction! You can only ");
+				_consoleview.WriteLine("This card is from the opponents faction! You can only ");
 				return;
 			}
-			if (cardtoBuy.CardCost <= PlayerResourceAvailable)
+			if (cardtoBuy.CardCost <= _player.ResourceAvailable)
 			{
 				ShopHand.RemoveAt(indexToBuy - 1);
-				PlayerDiscardPile.Add(cardtoBuy);
-				consoleview.WriteLine($"You bought {cardtoBuy.Name} for {cardtoBuy.CardCost}. The card is in your discard pile. \n");
-				PlayerResourceAvailable -= cardtoBuy.CardCost;
-				consoleview.WriteLine($"You have {PlayerResourceAvailable} resource remaining.\n");
+				_player.DiscardPile.Add(cardtoBuy);
+				_consoleview.WriteLine($"You bought {cardtoBuy.Name} for {cardtoBuy.CardCost}. The card is in your discard pile. \n");
+				_player.ResourceAvailable -= cardtoBuy.CardCost;
+				_consoleview.WriteLine($"You have {_player.ResourceAvailable} resource remaining.\n");
 
-				ShopHand.Insert(indexToBuy - 1, GameDeck.First());
-				consoleview.WriteLine($"{GameDeck.First().Name} was added to the shop!\n");
-				GameDeck.Remove(GameDeck.First());
+				ShopHand.Insert(indexToBuy - 1, ShopDeck.First());
+				_consoleview.WriteLine($"{ShopDeck.First().Name} was added to the shop!\n");
+				ShopDeck.Remove(ShopDeck.First());
 
 				return;
 			}
 			else
 			{
-				consoleview.WriteLine($"You can't afford this card! You have {PlayerResourceAvailable} resource; this card costs {cardtoBuy.CardCost} resource");
+				_consoleview.WriteLine($"You can't afford this card! You have {_player.ResourceAvailable} resource, " +
+					$""+$"this card costs {cardtoBuy.CardCost} resource");
 				return;
 			} 
 		}
@@ -325,34 +332,34 @@ public class Game
 	{
 
 
-		Card card = PlayerHand[cardIndex];
+		Card card = _player.Hand[cardIndex];
 
 		if (card.IsShown == false)
 		{
-			consoleview.WriteLine($"You must first show card {cardIndex + 1} to use their attack ability!");
+			_consoleview.WriteLine($"You must first show card {cardIndex + 1} to use their attack ability!");
 			return;
 		}
-		if (!(cardIndex >= 0 && cardIndex < PlayerHand.Count))
+		if (!(cardIndex >= 0 && cardIndex < _player.Hand.Count))
 		{
-			consoleview.WriteLine($"\n You don't have that card. You have {PlayerHand.Count} cards");
+			_consoleview.WriteLine($"\n You don't have that card. You have {_player.Hand.Count} cards");
 			return;
 		}
 
-		consoleview.WriteLine("You attack the enemy base!");
+		_consoleview.WriteLine("You attack the enemy base!");
 		//attack the base
 		//TODO - implement capitalShip defence logic
 		if (card.AttackValue > 0)
 		{
 			OpponenetBaseHitPoints -= card.AttackValue;
-			consoleview.WriteLine($"{card.Name} attacked the Empire base with {card.AttackValue} strength.");
+			_consoleview.WriteLine($"{card.Name} attacked the Empire base with {card.AttackValue} strength.");
 			if (OpponenetBaseHitPoints < 0)
 			{
-				consoleview.WriteLine($"You have destroyed the enemy base.");
+				_consoleview.WriteLine($"You have destroyed the enemy base.");
 				IsGameOver = true;
 			}
 			else
 			{
-				consoleview.WriteLine($"The Empire base was weakened and has {OpponenetBaseHitPoints} health left");
+				_consoleview.WriteLine($"The Empire base was weakened and has {OpponenetBaseHitPoints} health left");
 			}
 		}
 	}
@@ -369,7 +376,7 @@ public class Game
 			totalResource += card.ResourceValue;
 		}
 
-		consoleview.WriteLine($"\n");
+		_consoleview.WriteLine($"\n");
 		int cardNo = 0;
 		int lineNo = 0;
 		List<string> lines = new List<string>();
@@ -396,22 +403,22 @@ public class Game
 			cardNo++;
 		}
 
-		foreach (string line in lines) { consoleview.WriteLine(line); }
+		foreach (string line in lines) { _consoleview.WriteLine(line); }
 	}
 	private void ReportForce()
 	{
 		if (ForceBalance > 0)
 		{
-			consoleview.WriteLine($"The force is with the rebels with +{Math.Abs(ForceBalance)}");
+			_consoleview.WriteLine($"The force is with the rebels with +{Math.Abs(ForceBalance)}");
 			return;
 		}
 		if (ForceBalance == 0)
 		{
-			consoleview.WriteLine("The force is neither with the Rebels or the Empire");
+			_consoleview.WriteLine("The force is neither with the Rebels or the Empire");
 		}
 		if (ForceBalance < 0)
 		{
-			consoleview.WriteLine($"The force is with the Empire with +{Math.Abs(ForceBalance)}");
+			_consoleview.WriteLine($"The force is with the Empire with +{Math.Abs(ForceBalance)}");
 		}
 	}
 
@@ -421,47 +428,6 @@ public class Game
 	{
 		ForceBalance += delta;
 		Math.Clamp(ForceBalance, -4, 4);
-	}
-
-	void DiscardHand()
-	{
-		for (int i = 0; i< PlayerHand.Count; i++)
-		{
-			PlayerDiscardPile.AddRange(PlayerHand);
-			PlayerHand.RemoveAll(item => true);
-		}
-	}
-	void DrawNewHand()
-	{
-		consoleview.WriteLine("Drawing a new hand from player deck");
-
-
-		for (int i = 0; i < 5 ; i++)
-		{
-			if (PlayerDeck.Count == 0)
-			{
-				consoleview.WriteLine("Player deck is empty...");
-				ResetPlayerDeck();
-			}
-			Card card = PlayerDeck.First();
-			card.IsShown = false;
-			PlayerHand.Add(PlayerDeck.First());
-			PlayerDeck.Remove(PlayerDeck.First());
-		}
-
-		consoleview.WriteLine("You have 5 cards in Hand");
-	}
-
-	private void ResetPlayerDeck()
-	{
-		consoleview.WriteLine("Shuffling discard pile to build the next player deck...");
-		PlayerDiscardPile = PlayerDiscardPile.OrderBy(x => Random.Shared.Next()).ToList();
-
-		for (int i = 0; i < PlayerDiscardPile.Count(); i++)
-		{
-			PlayerDeck.Add(PlayerDiscardPile.First());
-			PlayerDiscardPile.Remove(PlayerDiscardPile.First());
-		}
 	}
 
 	void GameOver()
