@@ -27,17 +27,14 @@ namespace SpaceContestsWinForms
 
 		private void RtbConsole_KeyDown(object sender, KeyEventArgs e)
 		{
-			// Check if Enter key is pressed
-			if (e.KeyCode == Keys.Enter)
+			if (_game.IsPlayerTurn == true)
 			{
-				// Get the last line from the RichTextBox
-				string lastLine = GetLastLine(rtbConsole.Text);
-
-				// Trigger your custom event or perform any other action
-				_game.DoGameLoop(lastLine);
-
-				// Suppress the Enter key so that a new line is not added to the RichTextBox
-				e.SuppressKeyPress = false;
+				if (e.KeyCode == Keys.Enter)
+				{
+					string lastLine = GetLastLine(rtbConsole.Text);
+					_game.DoPlayerGameMove(lastLine);
+					e.SuppressKeyPress = false;
+				}
 			}
 		}
 
@@ -57,6 +54,15 @@ namespace SpaceContestsWinForms
 			if (rtbConsole != null)
 			{
 				rtbConsole.AppendText(text + "\n");
+			}
+		}
+
+		public void PromptPlayerForMove()
+		{
+			if (rtbConsole != null)
+			{
+				this.WriteLine("\rWhat is your next move?");
+				this.WriteLine("--> ");
 			}
 		}
 	}

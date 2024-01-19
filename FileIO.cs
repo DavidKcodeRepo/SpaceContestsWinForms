@@ -22,3 +22,7 @@ public static class FileIO
 		return File.ReadAllLines(fileName).ToList();
 	}
 }
+public static class GlobalConfig
+{
+	public const string CardData = "CardTables.csv";
+}
