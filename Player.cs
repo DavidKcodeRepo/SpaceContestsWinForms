@@ -1,12 +1,4 @@
-﻿using SpaceContest;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using SpaceContest;
-using SpaceContestsWinForms;
-
+﻿using SpaceContestsWinForms;
 namespace SpaceContest;
 
 // The player class contains the logic for the players cards, stores their choices and commits their actions.
@@ -21,6 +13,7 @@ public class Player
 	//public List<Card> CaptialShips { get; set; }
 	//public List<BaseCard> RemainingBaseCards { get; set; }
 
+	//TODO - implement bases
 	public int BaseHitPoints { get; set; }
 	public BaseCard Base { get;set; }
 	public bool IsBaseAbilityAvailable { get; set; }

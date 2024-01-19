@@ -1,16 +1,5 @@
-﻿using System;
-using System.Data;
-using System.Text.RegularExpressions;
-using System.Configuration;
-using SpaceContest;
-using System.Runtime.InteropServices.Marshalling;
-using System.Drawing.Printing;
-using SpaceContestsWinForms;
-using System.Numerics;
-
+﻿using SpaceContestsWinForms;
 namespace SpaceContest;
-
-
 
 /// <summary>
 /// The game keeps track of the states of the decks of cards, hands and discard piles, and manages shuffles.
@@ -27,8 +16,7 @@ public class Game
 	List<Card> ShopDeck { get; set; } = new List<Card>();
 	List<Card> ShopDiscardPile { get; set; } = new List<Card>();
 	List<Card> ShopHand { get; set; } = new List<Card>();
-	List<Card> RimBoyDeck { get; set; } = new List<Card>();
-
+	List<Card> OuterRimPilotDeck { get; set; } = new List<Card>();
 	
 	int ForceBalance = 4;
 	int OpponenetBaseHitPoints = 8;
@@ -36,7 +24,7 @@ public class Game
 	public Faction OpponentFaction;
 	public bool IsPlayerTurn = true;
 
-	//TODO - refactor opponent into a class that extends player.
+	//TODO - refactor opponent into a class that extends player.cs
 	List<Card> OpponentDeck { get; set; } = new List<Card>();
 	List<Card> OpponentHand { get; set; } = new List<Card>();
 	List<Card> OpponentDiscardPile { get; set; } = new List<Card>();
@@ -82,7 +70,7 @@ public class Game
 		_consoleview.WriteLine("Dealing cards to starting positions...");
 		OpponentDeck.AddRange((ShopDeck.GetRange(0, 10)));
 		_player.Deck.AddRange((ShopDeck.GetRange(10, 10)));
-		RimBoyDeck.AddRange((ShopDeck.GetRange(20, 10)));
+		OuterRimPilotDeck.AddRange((ShopDeck.GetRange(20, 10)));
 
 		ShopDeck.RemoveRange(0, 30);
 
@@ -100,8 +88,6 @@ public class Game
 		_consoleview.WriteLine("Dealing hand to player and opponent...");
 
 		//TODO - make choosing empire team an available choice
-
-
 
 		//give out starter hands
 		for (int i = 0; i < GameHandCount; i++)
@@ -124,8 +110,6 @@ public class Game
 		_consoleview.WriteLine("Hint: write 'help' for a list of commands");
 
 		_consoleview.WriteLine(" Player 1, it's your turn!");
-
-
 		
 		//start first round		
 		IsPlayerTurn = true;

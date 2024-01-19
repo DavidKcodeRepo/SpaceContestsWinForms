@@ -1,9 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Diagnostics.Eventing.Reader;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using System.ComponentModel;
+using System.Text.RegularExpressions;
+using System.Windows.Forms;
 
 namespace SpaceContest;
 
@@ -42,8 +39,50 @@ public Card(string line)
 		AttackValue = Convert.ToInt32(lineData[3]);
 		ForceValue = Convert.ToInt32(lineData[4]);
 		Category = PadBoth(lineData[5],22);
+		
+		
 		Ability = lineData[6];
+		List<string> abilityLines = new List<string>();
+
+
+		if (Ability.Contains("NULL"))
+		{
+			for (int i = 0; i < 7; i++) { string row = PadBoth("", 22); abilityLines.Add(row); }
+		}
+		else
+		{
+			abilityLines = PutStringInColumns(lineData[6], 22, 7);
+
+			for (int i = 0; i < abilityLines.Count; i++)
+			{
+				abilityLines[i] = PadBoth(abilityLines[i], 22);
+			}
+			for (int i = abilityLines.Count; i < 7; i++)
+			{
+				abilityLines.Add( PadBoth("", 22));
+			}
+		}
+
 		Reward = lineData[7];
+		List<string> rewardLines = new List<string>();
+
+		if (Reward.Contains("NULL"))
+		{
+			for (int i = 0; i < 4; i++) { string row = PadBoth("", 22); rewardLines.Add(row); }
+		}
+		else
+		{
+			rewardLines = PutStringInColumns(lineData[7], 20, 4);
+
+			for (int i = 0; i < rewardLines.Count; i++)
+			{
+				rewardLines[i] = PadBoth(rewardLines[i], 22);
+			}
+			for (int i = rewardLines.Count; i < 4; i++)
+			{
+				rewardLines.Add(PadBoth(" ", 22));
+			}
+		}
 
 		ShownCardText = 
 			 $"  _________________________  \r\n"+
@@ -56,19 +95,19 @@ public Card(string line)
 			 $"|                           |\r\n"+
 			 $"|   {Category}  |\r\n"+
 			 $"|                           |\r\n"+
-			 $"|   6666666666666666666666  |\r\n"+
-			 $"|   6666666666666666666666  |\r\n"+
-			 $"|   6666666666666666666666  |\r\n"+
-			 $"|   6666666666666666666666  |\r\n"+
-			 $"|   6666666666666666666666  |\r\n"+
-			 $"|   6666666666666666666666  |\r\n"+
-			 $"|   6666666666666666666666  |\r\n"+
+			 $"|   {abilityLines[0]}  |\r\n"+
+			 $"|   {abilityLines[1]}  |\r\n"+
+			 $"|   {abilityLines[2]}  |\r\n"+
+			 $"|   {abilityLines[3]}  |\r\n"+
+			 $"|   {abilityLines[4]}  |\r\n"+
+			 $"|   {abilityLines[5]}  |\r\n"+
+			 $"|   {abilityLines[6]}  |\r\n"+
 			 $"|     _  _  _  _  _  _  _   |\r\n"+
 			 $"|                           |\r\n"+
-			 $"|   7777777777777777777777  |\r\n"+
-			 $"|   7777777777777777777777  |\r\n"+
-			 $"|   7777777777777777777777  |\r\n"+
-			 $"|   7777777777777777777777  |\r\n"+
+			 $"|   {rewardLines[0]}  |\r\n"+
+			 $"|   {rewardLines[1]}  |\r\n"+
+			 $"|   {rewardLines[2]}  |\r\n"+
+			 $"|   {rewardLines[3]}  |\r\n"+
 			 $"\\                           /\r\n"+
 			 $" \\_________________________/ ";
 
@@ -83,13 +122,13 @@ public Card(string line)
 			 $"                             \r\n" +
 			 $"|   {Category}  |\r\n" +
 			 $"                             \r\n" +
-			 $"|   6666666666666666666666  |\r\n" +
-			 $"    6666666666666666666666   \r\n" +
-			 $"|   6666666666666666666666  |\r\n" +
-			 $"    6666666666666666666666   \r\n" +
-			 $"|   6666666666666666666666  |\r\n" +
-			 $"    6666666666666666666666   \r\n" +
-			 $"|   6666666666666666666666  |\r\n" +
+			 $"|   {abilityLines[0]}  |\r\n" +
+			 $"    {abilityLines[1]}   \r\n" +
+			 $"|   {abilityLines[2]}  |\r\n" +
+			 $"    {abilityLines[3]}   \r\n" +
+			 $"|   {abilityLines[4]}  |\r\n" +
+			 $"    {abilityLines[5]}   \r\n" +
+			 $"|   {abilityLines[6]}  |\r\n" +
 			 $"      _  _  _  _  _  _  _    \r\n" +
 			 $"|                           |\r\n" +
 			 $"    7777777777777777777777   \r\n" +
@@ -121,6 +160,69 @@ public Card(string line)
 			return source.PadLeft(padLeft).PadRight(length);
 		}
 		return source;
+	}
+
+	private List<string> PutStringInColumns(string inputString, int colWidth, int rowNum)
+	{
+		//inputString = "Your opponent discards 1 card from their hand(at Random if the force is with you)"; //test string
+		List<string> output = new List<string>();
+
+		List<int> wordbreaks = FindCharIndexes(inputString, ' ');
+		int nextLineBreak = colWidth;
+		List<string> words = inputString.Split(' ').ToList();
+		string line = "";
+
+		//go through every space
+		for (int i = 0; i <= wordbreaks.Count; i++)
+		{
+			//Special condition: are you on the very last space?
+			if (i == wordbreaks.Count)
+			{
+				//check this is going to fit
+				if((line + " " + words[i]).Length < colWidth)
+				{
+					output.Add(line + " " + words[i]);
+				}
+				//else cut the last word onto new line.
+				else
+				{
+					output.Add(line);
+					output.Add(words[i]);
+				}
+				break;
+			}
+			//if not over the next linebreak char, we're good to add the word we just passed
+			if (wordbreaks[i] +1 < nextLineBreak)
+			{
+				line = line + " " + (words[i]);
+				
+			}
+			//otherwise, its a newline			
+			else
+			{
+				//calc start and max end character
+				output.Add(line);
+				nextLineBreak = wordbreaks[i] + colWidth - words[i].Length;
+				line = words[i];
+			}
+		}
+		int linesAdded = output.Count;
+		for(int i = 0; i < rowNum - linesAdded; i++) { output.Add(""); }
+
+		return output;
+	}
+	private List<int> FindCharIndexes(string inputString, char charToFind)
+	{
+		List<int> indexes = new List<int>();
+
+		for (int i = 0; i < inputString.Length; i++)
+		{
+			if (inputString[i] == charToFind)
+			{
+				indexes.Add(i);
+			}
+		}
+		return indexes;
 	}
 }
 
