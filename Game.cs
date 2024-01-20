@@ -51,11 +51,24 @@ public class Game
 		//Creates the decks of cards to GameDeck, PlayerDeck & OpponentDeck
 		// & Deals first hand to ShopHand, playerHand, and OpponentHand
 
-		_consoleview.WriteLine("Let's play Star Cards!");
+		List<string> TitleArt = new List<string> {
+
+			"  ____                              ____               _              _        ",
+			" / ___|  _ __    __ _   ___  ___   / ___| ___   _ __  | |_  ___  ___ | |_  ___ ",
+			" \\___ \\ | '_ \\  / _` | / __|/ _ \\ | |    / _ \\ | '_ \\ | __|/ _ \\/ __|| __|/ __|",
+			"  ___) || |_) || (_| || (__|  __/ | |___| (_) || | | || |_|  __/\\__ \\| |_ \\__ \\",
+			" |____/ | .__/  \\__,_| \\___|\\___|  \\____|\\___/ |_| |_| \\__|\\___||___/ \\__||___/",
+			"        |_|                                                                    "
+			};
+
+	foreach(string title in TitleArt)
+		{
+			_consoleview.WriteLine(title);
+		}
 		//Console.WriteLine("this line");
 
 		//(("Let's play some space contests"));
-		_consoleview.WriteLine("______________");
+		_consoleview.WriteLine("______________\n");
 		_consoleview.WriteLine("Getting the deck out the box...");
 		string sourceFile = GlobalConfig.CardData.FullFilePath();
 		List<string> sourceData = sourceFile.LoadFile();
