@@ -1,4 +1,6 @@
 ﻿using SpaceContestsWinForms;
+using static System.Windows.Forms.VisualStyles.VisualStyleElement;
+
 namespace SpaceContest;
 
 /// <summary>
@@ -207,7 +209,7 @@ public class Game
 				{
 					if (int.TryParse(userInputParts[1], out int cardToBuy))
 					{
-						BuyCard(cardToBuy);
+						BuyCard(cardToBuy - 1);
 					}
 					else { _consoleview.WriteLine("\nI didn't understand. To buy a Card from shop write \"buyCard [int]\" "); }
 				};
@@ -230,9 +232,89 @@ public class Game
 					else { _consoleview.WriteLine("\nI didn't understand. To attack the enemy base write \"attack Base [int]\" or \"attackBase [int] [int]...\" "); }
 				}
 				break;
+			case "useAbility":
+				if (userInputParts.Length == 2)
+				{
+					if (int.TryParse(userInputParts[1], out int cardToAction))
+					{
+						UseAbility(cardToAction - 1);
+					}
+					else { _consoleview.WriteLine("\nI didn't understand. To use a Cards ability from shop write \"useAbility [int]\" "); }
+				};
+				break;
 			default:
 				break;
 		}
+	}
+
+	private void UseAbility(int cardIndex)
+	{
+		Card card = _player.Hand[cardIndex];
+		string condition = card.ConditionForAbilityBoon;
+		string conditionMet = card.AbilityBoonConditionMet;
+		string conditionNotMet = card.AbilityBoonConditionNotMet;
+
+		if (card.IsShown == false)
+		{
+			_consoleview.WriteLine($"You must first show card {cardIndex + 1} to use their attack ability!");
+			return;
+		}
+		if (!(cardIndex >= 0 && cardIndex < _player.Hand.Count))
+		{
+			_consoleview.WriteLine($"\n You don't have that card. You have {_player.Hand.Count} cards");
+			return;
+		}
+
+		if (TestCondition(condition))
+		{
+			ActionBoon(conditionMet, card);
+		}
+        else
+        {
+			ActionBoon(conditionNotMet, card);
+        }
+		return;
+    }
+
+	private void ActionBoon(string boon, Card card)
+	{
+		switch (boon)
+		{
+			case "1A|1R|1F":
+				string prompt = "Would you like 1 attack, 1 resource, or 1 force? Reply 'A', 'R' or 'F'.";
+					_consoleview.RequestUserInput(Reward,prompt,card);
+				break;
+			case "something else":
+				break;
+			default:
+				break;
+		}
+	}
+
+	public void Reward(string userChoice, Card card)
+	{
+		switch (userChoice)
+		{
+			case "A":
+				card.BonusAttackValue += 1;
+				_consoleview.WriteLine($"{card.Name} now has an Attack Strength");
+				break;
+			case "R":
+				_player.AttackAvailable += 1;
+				_consoleview.WriteLine($"{card.Name} contributed resource, you now have {_player.ResourceAvailable} resources to spend");
+
+				break;
+			case "F":
+				ForceChange(1);
+				_consoleview.WriteLine($"{card.Name} has the force with them!");
+				ReportForce();
+				break;
+		}
+	}
+
+	private bool TestCondition(string condition)
+	{
+		return true;
 	}
 
 	#endregion
@@ -293,9 +375,9 @@ public class Game
 
 	void BuyCard(int indexToBuy)
 	{
-		if (indexToBuy > 0 && indexToBuy <= ShopHand.Count)
+		if (indexToBuy > 0 && indexToBuy < ShopHand.Count)
 		{
-			Card cardtoBuy = ShopHand[indexToBuy - 1];
+			Card cardtoBuy = ShopHand[indexToBuy];
 
 			if ( cardtoBuy.Faction == OpponentFaction)
 			{
@@ -424,7 +506,7 @@ public class Game
 	void ForceChange(int delta)
 	{
 		ForceBalance += delta;
-		Math.Clamp(ForceBalance, -4, 4);
+		ForceBalance = Math.Clamp(ForceBalance, -4, 4);
 	}
 
 	void GameOver()

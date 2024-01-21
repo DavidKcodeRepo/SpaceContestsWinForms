@@ -6,15 +6,22 @@ namespace SpaceContest;
 
 public class Card
 {
+	// TODO - lots of properties, move these to a dictionary?
 	public int Id { get; set; }
 	public string Name { get; set; }
 	public Faction Faction {get;set;}
 	public int CardCost { get; set; }
 	public int ResourceValue { get; set; }
 	public int AttackValue { get; set; }
+	public int BonusAttackValue { get; set; } = 0;
+
 	public int ForceValue { get; set; }
 	public string Category { get; set; }
 	public string Ability { get; set; }
+	public string ConditionForAbilityBoon { get; set; }
+	public string AbilityBoonConditionMet { get; set; }
+	public string AbilityBoonConditionNotMet { get; set; }
+
 	public string Reward { get; set; }
 	public string ShownCardText { get; set; }
 	public string HiddenCardText { get; set; }
@@ -39,7 +46,6 @@ public Card(string line)
 		AttackValue = Convert.ToInt32(lineData[3]);
 		ForceValue = Convert.ToInt32(lineData[4]);
 		Category = PadBoth(lineData[5],22);
-		
 		
 		Ability = lineData[6];
 		List<string> abilityLines = new List<string>();
@@ -137,6 +143,10 @@ public Card(string line)
 			 $"|   {rewardLines[3]}  |\r\n" +
 			 $"                             \r\n" +
 			 $" \\ _ _ _ _ _ _ _ _ _ _ _ _ / ";
+
+		ConditionForAbilityBoon = lineData[14]; // 14
+		AbilityBoonConditionMet = lineData[15]; // 15
+		AbilityBoonConditionNotMet = lineData[13]; // 13
 	}
 
 	public string DisplayText(bool IsShown)

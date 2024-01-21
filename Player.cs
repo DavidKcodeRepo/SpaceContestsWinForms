@@ -20,7 +20,6 @@ public class Player
 	public List<bool> IsHandShown { get; set; }
 	public int ResourceAvailable { get; set; }
 	public int AttackAvailable { get; set; }
-
 	public List<Card> Deck { get; set; } = new List<Card>();
 	public List<Card> Hand { get; set; } = new List<Card>();
 	public List<Card> DiscardPile { get; set; } = new List<Card>();
@@ -37,6 +36,7 @@ public class Player
 		this.AttackAvailable = 0;
 	}
 
+	#region cardHandling
 	public void DrawNewHand()
 	{
 		_consoleview.WriteLine("Drawing a new hand from player deck");
@@ -75,4 +75,8 @@ public class Player
 			Hand.RemoveAll(item => true);
 		}
 	}
+
+	#endregion
+
+
 }
