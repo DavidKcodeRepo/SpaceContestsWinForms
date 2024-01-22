@@ -14,6 +14,7 @@ The following
 ## Implementation
 
  - SpaceContests was originally intended to be a purely console application implementation, but it has become a winforms application to avoid heavy reconfiguration of the windows console to suit the needs of the game.
+ - One  aim of the project is to expand the game into a 2 player console-over-tcp app on a server and connect to friends to play. 
  - The code is structured as per classes in the following diagram.
 ```mermaid
 sequenceDiagram
@@ -43,11 +44,12 @@ BuyCard [int; a card reference from 1-6]
 ## Credits & Acknowledgements
 
 This app is not written with any affiliations and is intended as an educational exercise primarily; it is not to be shared for public distribution. 
+This app is based off a 
 
 
 
 
 > Written with [StackEdit](https://stackedit.io/).
 <!--stackedit_data:
-eyJoaXN0b3J5IjpbMTExMTUwNzE4NCwtMTQ5OTA5NjEwNV19
+eyJoaXN0b3J5IjpbLTg5ODUzODA2NywtMTQ5OTA5NjEwNV19
 -->
