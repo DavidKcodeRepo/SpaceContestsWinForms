@@ -43,13 +43,10 @@ BuyCard [int; a card reference from 1-6]
 
 ## Credits & Acknowledgements
 
-This app is not written with any affiliations and is intended as an educational exercise primarily; it is not to be shared for public distribution. 
-This app is based off a 
-
-
-
+ - This app is not written with any affiliations and is intended as an educational exercise primarily; it is not to be shared for public distribution.
+- As this app bears similarity to protected properties, the app is private and the characters, locations and settings are delisted from this repository.
 
 > Written with [StackEdit](https://stackedit.io/).
 <!--stackedit_data:
-eyJoaXN0b3J5IjpbLTg5ODUzODA2NywtMTQ5OTA5NjEwNV19
+eyJoaXN0b3J5IjpbLTM4MDcyNTYyMywtMTQ5OTA5NjEwNV19
 -->
