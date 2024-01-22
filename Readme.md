@@ -1,8 +1,6 @@
 # Space Contest
 
-Space Contest is a card game in a console app based off the popular concepts of deck building games. The player plays against an automated opponent, taking advantages of resources and abilities offered by the cards. 
-
-The following
+Space Contest is a card game in a console app based off the popular concepts of deck building games. In this 2 player game, players recruit   mercenaries from the galaxy in an effort to strengthen their forces to take out their opponent before they get taken out. 
 
 ## Features
 
@@ -48,5 +46,5 @@ BuyCard [int; a card reference from 1-6]
 
 > Written with [StackEdit](https://stackedit.io/).
 <!--stackedit_data:
-eyJoaXN0b3J5IjpbLTM4MDcyNTYyMywtMTQ5OTA5NjEwNV19
+eyJoaXN0b3J5IjpbOTAyODE5NjMzLC0xNDk5MDk2MTA1XX0=
 -->
