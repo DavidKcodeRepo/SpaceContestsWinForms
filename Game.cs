@@ -1,4 +1,7 @@
 ﻿using SpaceContestsWinForms;
+using System;
+using System.Reflection.Metadata.Ecma335;
+using System.Text.RegularExpressions;
 using static System.Windows.Forms.VisualStyles.VisualStyleElement;
 
 namespace SpaceContest;
@@ -134,9 +137,14 @@ public class Game
 	#region gameLoop
 
 	bool IsGameOver = false;
+	
 
 	public void DoGameRound()
 	{
+		//reset non-persistant player stats, non persistant cards effects are reset at drawNewHand
+		_player.ExilesAvailable = 0;
+		_player.FreePurchasesAvailable = 0;
+		_player.ResourceAvailable = 0;
 		_player.DiscardHand();
 		_player.DrawNewHand();
 		IsPlayerTurn = false;
@@ -158,7 +166,9 @@ public class Game
 
 	public void DoPlayerGameMove(string userInput)
 	{
-		_consoleview.WriteLine("\n");
+		string userErrorPrompt;
+
+        _consoleview.WriteLine("\n");
 
 		if (IsGameOver == true) { GameOver(); return; }
 		
@@ -183,45 +193,69 @@ public class Game
 			//	AllIn();
 			//	break;
 			case "showCard":
-				for (int i = 1; i < userInputParts.Length; i++) 
+				userErrorPrompt = "\nI didn't understand. To show a Card from shop write \"showCard [int]\" or \"showCard [int] [int]...\" ";
+
+                for (int i = 1; i < userInputParts.Length; i++) 
 				{
 					if (int.TryParse(userInputParts[i], out int cardToShow))
 					{
 						ShowCard(cardToShow - 1);
 					}
-					else { _consoleview.WriteLine("\nI didn't understand. To show a Card from shop write \"showCard [int]\" or \"showCard [int] [int]...\" "); }
+					else { _consoleview.WriteLine(userErrorPrompt); }
 				}
 				break;
 			case "peekHand":
 				DisplayCards(_player.Hand);
 				break;
 			case "peekShop":
+				ReportResource(_player);
 				DisplayCards(ShopHand);
 				break;
 			case "peekDiscards":
-				DisplayCards(_player.DiscardPile);
+				DisplayCardsShort(_player.DiscardPile);
 				break;
-			case "whereIsForce":
+            case "peekShopDiscards":
+                DisplayCardsShort(ShopDiscardPile);
+                break;
+            case "reportForce":
 				ReportForce();
 				break;
 			case "buyCard":
-				if(userInputParts.Length == 2)
+				userErrorPrompt = "\nI didn't understand. To buy a Card from shop write \"buyCard [int]\" ";
+
+                if (userInputParts.Length == 2)
 				{
 					if (int.TryParse(userInputParts[1], out int cardToBuy))
 					{
 						BuyCard(cardToBuy - 1);
 					}
-					else { _consoleview.WriteLine("\nI didn't understand. To buy a Card from shop write \"buyCard [int]\" "); }
+					else { _consoleview.WriteLine(userErrorPrompt); }
 				};
 				break;
-			case "endTurn":
+            case "buyCardFree":
+                userErrorPrompt = "\nI didn't understand. To buy a Card for free from shop write \"buyCardFree [int]\" ";
+
+                if (userInputParts.Length == 2)
+                {
+                    if (int.TryParse(userInputParts[1], out int cardToBuy))
+                    {
+                        BuyCardFree(cardToBuy - 1);
+                    }
+                    else { _consoleview.WriteLine(userErrorPrompt); }
+                };
+                break;
+            case "endTurn":
 				_consoleview.WriteLine("You end your turn");
+				_player.ResourceAvailable = 0;
+				_player.AttackAvailable = 0;
 				DoGameRound();
 				break;
 			case "attackBase":
-				if (userInputParts.Length < 2)
+				userErrorPrompt = "\nI didn't understand. To attack the enemy base write \\\"attackBase [int]\\\" or \\\"attackBase [int] [int]...\\\"";
+
+                if (userInputParts.Length < 2)
 				{
-					_consoleview.WriteLine("\nI didn't understand. To attack the enemy base write \"attack Base [int]\" or \"attackBase [int] [int]...\" ");
+					_consoleview.WriteLine(userErrorPrompt);
 				}
 				for (int i = 1; i < userInputParts.Length; i++)
 				{
@@ -229,98 +263,328 @@ public class Game
 					{
 						AttackBase(cardToFight - 1);
 					}
-					else { _consoleview.WriteLine("\nI didn't understand. To attack the enemy base write \"attack Base [int]\" or \"attackBase [int] [int]...\" "); }
+					else { _consoleview.WriteLine(userErrorPrompt); }
 				}
 				break;
-			case "useAbility":
-				if (userInputParts.Length == 2)
+            case "attackShop":
+				userErrorPrompt = "\nI didn't understand. To attack a card in the shop base write \"attackShop [target:int] [attackCard:int]\"" +
+                                  "\nor \"attackShop [target:int] [attackCard:int] [attackCard:int]...\" ";
+                if (userInputParts.Length < 3)
+                {
+                    _consoleview.WriteLine(userErrorPrompt);
+                }
+
+				if (int.TryParse(userInputParts[1], out int targetIndex))
+				{
+					;
+				}
+				else { _consoleview.WriteLine(userErrorPrompt); }
+
+				List<int> attackerIndexes = new List<int>();
+                for (int i = 2; i < userInputParts.Length; i++)
+                {
+                    if (int.TryParse(userInputParts[i], out int attackerIndex))
+					{
+                        attackerIndexes.Add(attackerIndex);
+                    }
+                    else { _consoleview.WriteLine(userErrorPrompt); }
+                }
+				AttackCard(targetIndex, attackerIndexes);
+
+                break;
+            case "useAbility":
+				userErrorPrompt = "\nI didn't understand. To use a Cards ability from shop write \"useAbility [int]\" ";
+
+                if (userInputParts.Length == 2)
 				{
 					if (int.TryParse(userInputParts[1], out int cardToAction))
 					{
 						UseAbility(cardToAction - 1);
 					}
-					else { _consoleview.WriteLine("\nI didn't understand. To use a Cards ability from shop write \"useAbility [int]\" "); }
+					else { _consoleview.WriteLine(userErrorPrompt); }
 				};
 				break;
-			default:
+			case "exile":
+                userErrorPrompt = "\nI didn't understand. To exile a Card from hand write \"exile [int]\" ";
+
+                if (userInputParts.Length == 2)
+                {
+                    if (int.TryParse(userInputParts[1], out int index))
+                    {
+                        ExileHand(index - 1);
+                    }
+                    else { _consoleview.WriteLine(userErrorPrompt); }
+                };
+                break;
+            case "exileDiscard":
+                userErrorPrompt = "\nI didn't understand. To exile a Card from discard write \"exileDiscard [int]\" ";
+
+                if (userInputParts.Length == 2)
+                {
+                    if (int.TryParse(userInputParts[1], out int index))
+                    {
+                        ExileDiscard(index - 1);
+                    }
+                    else { _consoleview.WriteLine(userErrorPrompt); }
+                };
+                break;
+
+            default:
 				break;
 		}
 	}
 
-	private void UseAbility(int cardIndex)
-	{
-		Card card = _player.Hand[cardIndex];
-		string condition = card.ConditionForAbilityBoon;
-		string conditionMet = card.AbilityBoonConditionMet;
-		string conditionNotMet = card.AbilityBoonConditionNotMet;
 
-		if (card.IsShown == false)
+    #endregion
+    #region CardEffects
+    private void ActionBoon(string boon, Card card)
+    {
+		//where player must decide
+		if (boon.Contains("|"))
 		{
-			_consoleview.WriteLine($"You must first show card {cardIndex + 1} to use their attack ability!");
+			int optionCount = boon.Split('|').Count();
+			string optionText = "Reply";
+			for(int i = 0; i < optionCount; i++) { optionText.Concat($"'{i}',"); }
+
+			string prompt = $"That ability comes with choices. {card.Name} has ability: {card.Ability}. Which choice would you like? {optionText}";
+			_consoleview.RequestUserInput(PerkOption, prompt, card);
 			return;
 		}
-		if (!(cardIndex >= 0 && cardIndex < _player.Hand.Count))
-		{
-			_consoleview.WriteLine($"\n You don't have that card. You have {_player.Hand.Count} cards");
-			return;
-		}
-
-		if (TestCondition(condition))
-		{
-			ActionBoon(conditionMet, card);
-		}
-        else
-        {
-			ActionBoon(conditionNotMet, card);
-        }
+		//otherwise, keep going
+		else Perk(boon, card);
 		return;
     }
 
-	private void ActionBoon(string boon, Card card)
-	{
-		switch (boon)
-		{
-			case "1A|1R|1F":
-				string prompt = "Would you like 1 attack, 1 resource, or 1 force? Reply 'A', 'R' or 'F'.";
-					_consoleview.RequestUserInput(Reward,prompt,card);
-				break;
-			case "something else":
-				break;
-			default:
-				break;
-		}
-	}
+    public void PerkOption(string usersChoiceMessage, Card card)
+    {
+        //TODO parse fail?
 
-	public void Reward(string userChoice, Card card)
-	{
-		switch (userChoice)
-		{
-			case "A":
-				card.BonusAttackValue += 1;
-				_consoleview.WriteLine($"{card.Name} now has an Attack Strength");
-				break;
-			case "R":
-				_player.AttackAvailable += 1;
-				_consoleview.WriteLine($"{card.Name} contributed resource, you now have {_player.ResourceAvailable} resources to spend");
+        int choice;
+        int.TryParse(usersChoiceMessage, out choice);
+        choice = choice - 1;
+
+        string options = "";
+        if (TestCondition(card.ConditionForAbilityBoon))
+        {
+            options = card.AbilityBoonConditionMet;
+        }
+        else
+        {
+            options = card.AbilityBoonConditionMet;
+        }
+
+        string option = options.Split('|')[choice];
+
+        Perk(option, card);
+    }
+
+    public void Perk(string award, Card card)
+    {
+        Regex rewardPattern = new Regex(@"(\d+)([A-Z])");
+        MatchCollection rewardMatches = rewardPattern.Matches(award);
+
+        Dictionary<char, int> rewardDictionary = new Dictionary<char, int>();
+
+        foreach (Match match in rewardMatches)
+        {
+            int count = int.Parse(match.Groups[1].Value);
+            char rewardType = match.Groups[2].Value[0];
+            rewardDictionary[rewardType] = count;
+        }
+
+        foreach (var kvp in rewardDictionary)
+        {
+
+            switch (kvp.Key.ToString())
+            {
+                case "A":
+                    card.BonusAttackValue += kvp.Value;
+                    _consoleview.WriteLine($"{card.Name} now has {kvp.Value} Attack Strength");
+                    break;
+                case "B":
+                    OpponentBaseHealthChange(kvp.Value * -1);
+                    _consoleview.WriteLine($"{card.Name} Damaged the enemy base!");
+                    ReportOpponentBase();
+                    break;
+                case "C":
+                    break;
+                case "D":
+                    _consoleview.WriteLine($"{card.Name} draws a card!");
+                    _player.DrawCard();
+                    break;
+                case "E":
+                    _player.ExilesAvailable += kvp.Value;
+                    _consoleview.WriteLine($"\nYou may exile {kvp.Value} cards from your hand or discard pile. Type exile [int] or exileDiscard [int] to action");
+                    break;
+                case "F": //TODO assign current player force alignment at start of turn.
+                    int flipDarkSide = 1;
+                    if (_player.Faction == Faction.Empire)
+                    {
+                        flipDarkSide = -1;
+                    }
+                    ForceChange(kvp.Value * flipDarkSide);
+                    _consoleview.WriteLine($"{card.Name} has the force with them!");
+                    ReportForce();
+                    break;
+                case "G":
+					Card nextGalaxyCard = ShopDeck.First();
+                    _consoleview.WriteLine($"The next card is a {nextGalaxyCard.Name} of the {nextGalaxyCard.Faction} faction");
+                    if (nextGalaxyCard.Faction == Faction.Rebel) 
+					{ 
+						ShopDiscardPile.Add(ShopDeck[0]); ShopDeck.RemoveAt(0); 
+						_consoleview.WriteLine($"The rebel scum card is discarded!"); 
+					}
+                    break;
+                case "H":
+                    PlayerBaseHealthChange(kvp.Value);
+                    _consoleview.WriteLine($"{card.Name} Did repairs to the base!");
+                    ReportBase();
+                    break;
+                case "I":
+                    break;
+                case "J":
+                    break;
+                case "K":
+                    break;
+                case "L":
+                    break;
+                case "M":
+                    break;
+                case "N":
+                    break;
+                case "O":
+                    break;
+                case "P":
+                    break;
+                default:
+                    break;
+                case "Q":
+					_player.FishDiscard(card);
+					_consoleview.WriteLine($"{card.Name} allows you to look through the discards, and finds these cards...");
+                    break;
+                case "R":
+                    _player.ResourceAvailable += kvp.Value;
+                    _consoleview.WriteLine($"{card.Name} contributed resource, you now have {_player.ResourceAvailable} resources to spend");
+                    break;
+                case "S":
+                    _player.FreePurchasesAvailable += kvp.Value;
+                    _consoleview.WriteLine($"{card.Name} gained a free purchase, you now have {_player.FreePurchasesAvailable} free purchases to make");
+                    break;
+                case "T":
+					_player.NextPurchaseToTopOfDeck = true;
+                    _consoleview.WriteLine($"{card.Name} gained a free purchase, you now have {_player.FreePurchasesAvailable} free purchases to make");
+                    break;
+                case "X":
+                    _consoleview.WriteLine($"{card.Name} was exiled!");
+					_player.Hand.Remove(card);
+                    break;
+            }
+        }
+    }
+
+    private bool TestCondition(string condition)
+    {
+		bool output = true;
+
+		switch (condition)
+			{
+            case "CC":
+
+                break;
+            case "CD":
 
 				break;
-			case "F":
-				ForceChange(1);
-				_consoleview.WriteLine($"{card.Name} has the force with them!");
-				ReportForce();
+            case "CE":
+
+                break;
+            case "CF":
+                int flipDarkSide = 1;
+                if (_player.Faction == Faction.Empire)
+				{
+                    flipDarkSide = -1;
+				} 
+                if (ForceBalance * flipDarkSide > 0 ? output = true : output = false);
+                break;
+            case "CG":
+				Card nextGalaxyCard = ShopDeck.First();
+				if (nextGalaxyCard.Faction == Faction.Empire ? output = true : output = false);
+                break;
+            case "CM":
+				if (_player.Hand.Any(x => x.Name == "Milli Falcon") ? output = true: output = false);
+
+                break;
+            case "CO":
+
+                break;
+            case "CT":
+				if (_player.Hand.Any(x => x.Category == "Trooper") || _player.Hand.Any(x => x.Category == "Vehicle")) 
+				{
+					output = true;
+				}
+                break;
+            case "CU":
+				if (_player.Hand.Any(x => x.IsUnique) ? output = true : output = false);
+                break;
+            default:
+				output = true;
 				break;
-		}
-	}
+			}
 
-	private bool TestCondition(string condition)
-	{
-		return true;
-	}
+		return output;
+    }
 
-	#endregion
-	#region playerCommands
+    private void RewardFromBountyTarget(Card card)
+    {
+        _consoleview.WriteLine($"\nYou killed {card.Name}");
+        _consoleview.WriteLine($"\nKilling {card.Name} yielded");
+        Regex rewardPattern = new Regex(@"(\d+)([A-Z])");
+        MatchCollection rewardMatches = rewardPattern.Matches(card.Reward);
 
-	void ShowHelp()
+        Dictionary<char, int> rewardDictionary = new Dictionary<char, int>();
+
+        foreach (Match match in rewardMatches)
+        {
+            int count = int.Parse(match.Groups[1].Value);
+            char rewardType = match.Groups[2].Value[0];
+            rewardDictionary[rewardType] = count;
+        }
+
+        foreach (var kvp in rewardDictionary)
+        {
+            switch (kvp.Key.ToString())
+            {
+                case "E":
+                    _player.ExilesAvailable += kvp.Value;
+                    _consoleview.WriteLine($"\nYou may exile {kvp.Value} cards from your hand or discard pile. Type Exile [int] to action");
+                    break;
+                case "F":
+                    int flipDarkSide = 1;
+                    if (_player.Faction == Faction.Empire)
+                    {
+                        flipDarkSide = -1;
+                    }
+                    ForceChange(1 * flipDarkSide);
+                    _consoleview.WriteLine($"\n A disturbance in the force. you gained {kvp.Value}");
+                    ReportForce();
+                    break;
+                case "P":
+                    _player.FreePurchasesAvailable += kvp.Value;
+                    _consoleview.WriteLine($"\n You may purchase {kvp.Value} cards from the shop. Type FreePurchase [int] to action");
+                    break;
+                case "R":
+                    _player.ResourceAvailable += kvp.Value;
+                    _consoleview.WriteLine($"\n {kvp.Value} resource, you now have {_player.ResourceAvailable} resources to spend");
+                    break;
+			}
+        }
+    }
+
+
+
+    #endregion
+    #region playerCommands
+
+    void ShowHelp()
 	{
 		//Console.WriteLine("Here are the game commands");
 		foreach (string com in CommandStrings) { /*Console.WriteLine(com);*/ }
@@ -368,49 +632,157 @@ public class Game
 		card.IsShown = true;
 		return;
 	}
-	void Attack(int cardSlot)
-	{
-		throw new NotImplementedException(message: "attack not implemented yet");
-	}
 
-	void BuyCard(int indexToBuy)
+	private void BuyCard(int indexToBuy)
 	{
-		if (indexToBuy > 0 && indexToBuy < ShopHand.Count)
+        //user error handling
+        string userErrorPrompt;
+		if (indexToBuy < 0 || indexToBuy > ShopHand.Count)
 		{
-			Card cardtoBuy = ShopHand[indexToBuy];
-
-			if ( cardtoBuy.Faction == OpponentFaction)
-			{
-				_consoleview.WriteLine("This card is from the opponents faction! You can only ");
-				return;
-			}
-			if (cardtoBuy.CardCost <= _player.ResourceAvailable)
-			{
-				ShopHand.RemoveAt(indexToBuy - 1);
-				_player.DiscardPile.Add(cardtoBuy);
-				_consoleview.WriteLine($"You bought {cardtoBuy.Name} for {cardtoBuy.CardCost}. The card is in your discard pile. \n");
-				_player.ResourceAvailable -= cardtoBuy.CardCost;
-				_consoleview.WriteLine($"You have {_player.ResourceAvailable} resource remaining.\n");
-
-				ShopHand.Insert(indexToBuy - 1, ShopDeck.First());
-				_consoleview.WriteLine($"{ShopDeck.First().Name} was added to the shop!\n");
-				ShopDeck.Remove(ShopDeck.First());
-
-				return;
-			}
-			else
-			{
-				_consoleview.WriteLine($"You can't afford this card! You have {_player.ResourceAvailable} resource, " +
-					$""+$"this card costs {cardtoBuy.CardCost} resource");
-				return;
-			} 
+			userErrorPrompt = $"\nYou must choose a card between 1 and {ShopHand.Count}";
+			_consoleview.WriteLine(userErrorPrompt);
+			return;
 		}
+        Card cardtoBuy = ShopHand[indexToBuy];
+
+		if ( cardtoBuy.Faction == OpponentFaction)
+		{
+			userErrorPrompt = $"This card is from the opponents faction! You can only purchase Neutral or {_player.Faction} cards.";
+            _consoleview.WriteLine(userErrorPrompt);
+			return;
+		}
+
+		if (cardtoBuy.CardCost > _player.ResourceAvailable)
+		{
+			userErrorPrompt = $"You can't afford this card! You have {_player.ResourceAvailable} resource, " +
+				$"" + $"this card costs {cardtoBuy.CardCost} resource";
+            _consoleview.WriteLine(userErrorPrompt);
+            return;
+        }
+
+		//users command is legal in the game rules
+		//take card from shop to discard, replace shop & reduce player resource by cost.
+		List<Card> destination = _player.DiscardPile;
+
+
+		//cards with special purchase actions
+		if (cardtoBuy.Name == "Fang Fighter") { destination = _player.Hand; if (ForceBalance > 0) { _player.DrawCard(); }; }
+		if (cardtoBuy.Name == "Quarren Merc") {if (ForceBalance > 0) {_player.ExilesAvailable += 1;} _player.ExilesAvailable+= 1; }
+        
+		ShopHand.RemoveAt(indexToBuy);
+		if (_player.NextPurchaseToTopOfDeck == true)
+		{ 
+			_player.Deck.Insert(0,cardtoBuy);
+            _consoleview.WriteLine($"You bought {cardtoBuy.Name} for {cardtoBuy.CardCost}. The card is on top of your player deck. \n");
+			_player.NextPurchaseToTopOfDeck = false;
+        }
+        else
+		{
+            destination.Add(cardtoBuy);
+            _consoleview.WriteLine($"You bought {cardtoBuy.Name} for {cardtoBuy.CardCost}. \n");
+        }
+        _player.ResourceAvailable -= cardtoBuy.CardCost;
+		_consoleview.WriteLine($"You have {_player.ResourceAvailable} resource remaining.\n");
+
+		ShopHand.Insert(indexToBuy - 1, ShopDeck.First());
+		_consoleview.WriteLine($"{ShopDeck.First().Name} was added to the shop!\n");
+		ShopDeck.Remove(ShopDeck.First());
+		return;
 	}
 
-	private void AttackBase(int cardIndex)
+    private void BuyCardFree(int indexToBuy)
+    {
+		//user error handling
+        string userErrorPrompt;
+
+		if (indexToBuy! >= 0 && indexToBuy < ShopHand.Count)
+		{
+            userErrorPrompt = $"\nYou must choose a card between 1 and {ShopHand.Count}";
+            _consoleview.WriteLine(userErrorPrompt);
+        }
+		if (_player.FreePurchasesAvailable < 1)
+		{
+			userErrorPrompt = "\nYou do not have a Free Purchase token available";
+			_consoleview.WriteLine(userErrorPrompt);
+		}
+		Card cardToBuy = _player.Hand[indexToBuy];
+		if (cardToBuy.Faction != _player.Faction)
+		{
+			userErrorPrompt = "\nYou must buy a card of your faction";
+			_consoleview.WriteLine(userErrorPrompt);
+		}
+
+        //users command is legal in the game rules
+		//take card from shop to players discard, replace shop & reduce player's free purchase count.
+        ShopHand.RemoveAt(indexToBuy - 1);
+        _player.DiscardPile.Add(cardToBuy);
+        _consoleview.WriteLine($"You bought {cardToBuy.Name} for free! The card is in your discard pile. \n");
+        _player.FreePurchasesAvailable -= 1;
+        _consoleview.WriteLine($"You have {_player.FreePurchasesAvailable} free purchases remaining.\n");
+
+        ShopHand.Insert(indexToBuy - 1, ShopDeck.First());
+        _consoleview.WriteLine($"{ShopDeck.First().Name} was added to the shop!\n");
+        ShopDeck.Remove(ShopDeck.First());
+        return;
+    }
+
+    private void ExileHand(int index)
+    {
+        //user error handling
+        string userErrorPrompt;
+        if (index < 0 || index >= _player.Hand.Count)
+        {
+            userErrorPrompt = $"\nYou must choose a card between 1 and {_player.Hand.Count}";
+            _consoleview.WriteLine(userErrorPrompt);
+            return;
+        }
+        if (_player.ExilesAvailable <= 0)
+        {
+            userErrorPrompt = $"You do not have any exile tokens to exile this card!";
+            _consoleview.WriteLine(userErrorPrompt);
+            return;
+        }
+        Card card = _player.Hand[index];
+
+        //users command is legal in the game rules
+        //remove the card from the game
+
+        _consoleview.WriteLine($"You exiled {card.Name} from your hand");
+        _player.Hand.RemoveAt(index);
+		_player.ExilesAvailable -= 1;
+
+        return;
+    }
+    private void ExileDiscard(int index)
+    {
+        //user error handling
+        string userErrorPrompt;
+        if (index < 0 || index >= _player.DiscardPile.Count)
+        {
+            userErrorPrompt = $"\nYou must choose a card between 1 and {_player.Hand.Count}";
+            _consoleview.WriteLine(userErrorPrompt);
+            return;
+        }
+        if (_player.ExilesAvailable <= 0)
+        {
+            userErrorPrompt = $"You do not have any exile tokens to exile this card!";
+            _consoleview.WriteLine(userErrorPrompt);
+            return;
+        }
+        Card card = _player.DiscardPile[index];
+
+        //users command is legal in the game rules
+        //remove the card from the game
+
+        _consoleview.WriteLine($"You exiled {card.Name} from your discard pile");
+        _player.DiscardPile.RemoveAt(index);
+        _player.ExilesAvailable -= 1;
+
+        return;
+    }
+
+    private void AttackBase(int cardIndex)
 	{
-
-
 		Card card = _player.Hand[cardIndex];
 
 		if (card.IsShown == false)
@@ -418,7 +790,14 @@ public class Game
 			_consoleview.WriteLine($"You must first show card {cardIndex + 1} to use their attack ability!");
 			return;
 		}
-		if (!(cardIndex >= 0 && cardIndex < _player.Hand.Count))
+
+        if (card.HasAttacked == true)
+        {
+            _consoleview.WriteLine($"You cannot attack with {card.Name}. This card has already attacked this turn!");
+            return;
+        }
+
+        if (!(cardIndex >= 0 && cardIndex < _player.Hand.Count))
 		{
 			_consoleview.WriteLine($"\n You don't have that card. You have {_player.Hand.Count} cards");
 			return;
@@ -442,9 +821,90 @@ public class Game
 			}
 		}
 	}
-	#endregion
-	#region ConsoleHelpers 
-	void DisplayCards(List<Card> hand)
+
+    private void AttackCard(int targetIndex, List<int> attackerIndexes)
+    {
+        Card targetCard = ShopHand[targetIndex - 1];
+        List<Card> attackerCards = new List<Card>();
+        foreach (int index in attackerIndexes)
+        {
+            attackerCards.Add(_player.Hand[index - 1]);
+        }
+
+        int attackStrength = attackerCards.Sum(x => x.AttackValue) + attackerCards.Sum(x => x.BonusAttackValue);
+
+        if (attackStrength < targetCard.CardCost)
+        {
+            _consoleview.WriteLine(
+                "\nYour attackers have insufficient strength to beat this target" +
+               $"\nYou attacked with {attackerCards.Sum(x => x.AttackValue)}, you need {targetCard.CardCost} strength!");
+            return;
+        }
+
+        if (targetCard.Faction != OpponentFaction)
+        {
+            _consoleview.WriteLine("You cannot attack a Neutral card or a card of your own faction!");
+            return;
+        }
+
+        // attack is go
+
+        foreach (Card card in attackerCards)
+        {
+            card.HasAttacked = true;
+        }
+
+        ShopHand.RemoveAt(targetIndex - 1);
+        ShopDiscardPile.Add(targetCard);
+        _consoleview.WriteLine($"You killed {targetCard.Name}. The card has been moved to the shop discard pile. \n");
+        _consoleview.WriteLine($"You have {_player.ResourceAvailable} resource remaining.\n");
+
+        ShopHand.Insert(targetIndex - 1, ShopDeck.First());
+        _consoleview.WriteLine($"{ShopDeck.First().Name} was added to the shop!\n");
+        ShopDeck.Remove(ShopDeck.First());
+
+        //give bountyhunter rewards
+
+        //give target rewards
+        RewardFromBountyTarget(targetCard);
+    }
+    private void UseAbility(int cardIndex)
+    {
+		// check input
+        if (!(cardIndex >= 0 && cardIndex < _player.Hand.Count))
+        {
+            _consoleview.WriteLine($"\n You don't have that card. You have {_player.Hand.Count} cards");
+            return;
+        }
+        Card card = _player.Hand[cardIndex];
+        if (card.IsShown == false)
+        {
+            _consoleview.WriteLine($"You must first show card {cardIndex + 1} to use their ability!");
+            return;
+        }
+
+        //review conditional statements on card
+        string condition = card.ConditionForAbilityBoon;
+        string awardForConditionMet = card.AbilityBoonConditionMet;
+        string awardForConditionNotMet = card.AbilityBoonConditionNotMet;
+
+		//where card is not conditional, the award text is placed in awardForConditionMet, and condition == true
+        if (TestCondition(condition))
+        {
+            ActionBoon(awardForConditionMet, card);
+        }
+        else
+        {
+            ActionBoon(awardForConditionNotMet, card);
+        }
+        return;
+    }
+
+
+
+    #endregion
+    #region ConsoleHelpers 
+    void DisplayCards(List<Card> hand)
 	{
 		int totalAttack = 0;
 		int totalResource = 0;
@@ -484,11 +944,32 @@ public class Game
 
 		foreach (string line in lines) { _consoleview.WriteLine(line); }
 	}
-	private void ReportForce()
+
+    void DisplayCardsShort(List<Card> hand)
+    {
+        _consoleview.WriteLine($" | Index | Cost | {PadBoth("Card Name", 14)}|\n");
+
+        for (int i = 0; i < hand.Count; i++ )
+        {
+			_consoleview.WriteLine($" |{PadBoth(Convert.ToString(i+1),7)}|{PadBoth(Convert.ToString(hand[i].CardCost), 6)}| {PadBoth(hand[i].Name, 14)}|");
+        }
+    }
+
+    private string PadBoth(string source, int length)
+    {
+        int spaces = length - source.Length;
+        if (spaces > 0)
+        {
+            int padLeft = spaces / 2 + source.Length;
+            return source.PadLeft(padLeft).PadRight(length);
+        }
+        return source;
+    }
+    private void ReportForce()
 	{
 		if (ForceBalance > 0)
 		{
-			_consoleview.WriteLine($"The force is with the rebels with +{Math.Abs(ForceBalance)}");
+			_consoleview.WriteLine($"The force is with the Rebels with +{Math.Abs(ForceBalance)}");
 			return;
 		}
 		if (ForceBalance == 0)
@@ -501,13 +982,42 @@ public class Game
 		}
 	}
 
-	#endregion
-	#region gameStateManagementHelpers
-	void ForceChange(int delta)
+	private void ReportOpponentBase()
+	{
+		_consoleview.WriteLine($"The opponents base now has {OpponenetBaseHitPoints} HP");
+	}
+
+	private void ReportBase()
+	{
+		//TODO capital ships
+		_consoleview.WriteLine($"Your base now has {_player.BaseHitPoints} HP");
+	}
+
+    private void ReportResource(Player player)
+    {
+        _consoleview.WriteLine($"You have {_player.ResourceAvailable} resources available to buy with");
+    }
+
+
+
+    #endregion
+    #region gameStateManagementHelpers
+    void ForceChange(int delta)
 	{
 		ForceBalance += delta;
 		ForceBalance = Math.Clamp(ForceBalance, -4, 4);
 	}
+	void PlayerBaseHealthChange(int delta)
+	{
+		_player.BaseHitPoints += delta;
+		_player.BaseHitPoints = Math.Clamp(_player.BaseHitPoints, 0, 8);
+	}
+	void OpponentBaseHealthChange(int delta)
+	{
+		OpponenetBaseHitPoints+= delta;
+		OpponenetBaseHitPoints = Math.Clamp(OpponenetBaseHitPoints, 0, 8);
+	}
+
 
 	void GameOver()
 	{

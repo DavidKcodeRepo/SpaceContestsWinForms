@@ -1,4 +1,5 @@
 ﻿using SpaceContestsWinForms;
+using System.Linq;
 namespace SpaceContest;
 
 // The player class contains the logic for the players cards, stores their choices and commits their actions.
@@ -20,7 +21,11 @@ public class Player
 	public List<bool> IsHandShown { get; set; }
 	public int ResourceAvailable { get; set; }
 	public int AttackAvailable { get; set; }
-	public List<Card> Deck { get; set; } = new List<Card>();
+	public int ExilesAvailable { get; set; }
+    public int FreePurchasesAvailable { get; set; }
+	public bool NextPurchaseToTopOfDeck { get; set; }
+
+    public List<Card> Deck { get; set; } = new List<Card>();
 	public List<Card> Hand { get; set; } = new List<Card>();
 	public List<Card> DiscardPile { get; set; } = new List<Card>();
 
@@ -34,7 +39,11 @@ public class Player
 		this.IsHandShown = new List<bool>();
 		this.ResourceAvailable = 0;
 		this.AttackAvailable = 0;
-	}
+		this.ExilesAvailable = 0;
+		this.FreePurchasesAvailable = 0;
+        this.NextPurchaseToTopOfDeck = false;
+
+    }
 
 	#region cardHandling
 	public void DrawNewHand()
@@ -50,6 +59,7 @@ public class Player
 			}
 			Card card = Deck.First();
 			card.IsShown = false;
+			card.HasAttacked = false;
 			Hand.Add(Deck.First());
 			Deck.Remove(Deck.First());
 		}
@@ -67,7 +77,27 @@ public class Player
 			DiscardPile.Remove(DiscardPile.First());
 		}
 	}
-	public void DiscardHand()
+
+    public void DrawCard()
+    {
+        _consoleview.WriteLine("Drawing a card hand from player deck");
+
+        if (Deck.Count == 0)
+        {
+            _consoleview.WriteLine("Player deck is empty...");
+            ResetPlayerDeck();
+        }
+
+        Card card = Deck.First();
+        card.IsShown = false;
+        card.HasAttacked = false;
+        card.BonusAttackValue = 0;
+        Hand.Add(Deck.First());
+        Deck.Remove(Deck.First());
+
+        _consoleview.WriteLine($"You drew the {card.Name}");
+    }
+    public void DiscardHand()
 	{
 		for (int i = 0; i < Hand.Count; i++)
 		{
@@ -76,7 +106,46 @@ public class Player
 		}
 	}
 
-	#endregion
+	public void FishDiscard(Card card)
+	{
+		// default predicate ensures that all cards are returned for discard fishing (e.g. tatooine, jawa), and is overwritten for cards that fish specifically
+		Predicate<Card> predicate = x => x.Name is string;
+
+        if (card.Name == "Milli Falcon") { predicate = x => x.IsUnique == true; }
+        if (card.Name == "AT-AT") { predicate = x => x.Category == Category.Trooper.ToString(); }
+        if (card.Name == "Jabba's Barge") { predicate = x => x.Category == Category.BountyHunter.ToString(); }
+
+		List<Card> cardsOfCategory = DiscardPile.FindAll(predicate).ToList(); 
+
+		_consoleview.WriteLine("please select a card. Write \"[int]\" to chose a card");
+		for(int i = 0;i < cardsOfCategory.Count;i++ )
+		{
+			_consoleview.WriteLine($"|{i}|{cardsOfCategory[i].Name}|{cardsOfCategory[i].CardCost}|");
+			_consoleview.RequestUserInput(FishDiscardUserchoice, "please select a card. Write 1, 2, 3",card);
+        }
+    }
+
+    public void FishDiscardUserchoice(string userChoice, Card card)
+    {
+		//check user reponse
+		int.TryParse(userChoice, out int index);
+
+        Predicate<Card> predicate = x => x.Name is string;
+
+        if (card.Name == "Milli Falcon") { predicate = x => x.IsUnique == true; }
+        if (card.Name == "AT-AT") { predicate = x => x.Category == Category.Trooper.ToString(); }
+        if (card.Name == "Jabba's Barge") { predicate = x => x.Category == Category.BountyHunter.ToString(); }
+
+        List<Card> cardsOfCategory = DiscardPile.FindAll(predicate).ToList();
+
+		Card userCard = cardsOfCategory[index];
+
+		Hand.Add(userCard);
+		DiscardPile.Remove(userCard);
+		return;
+    }
+
+    #endregion
 
 
 }

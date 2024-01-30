@@ -17,7 +17,8 @@ public class Card
 
 	public int ForceValue { get; set; }
 	public string Category { get; set; }
-	public string Ability { get; set; }
+    public bool IsUnique { get; set; }
+    public string Ability { get; set; }
 	public string ConditionForAbilityBoon { get; set; }
 	public string AbilityBoonConditionMet { get; set; }
 	public string AbilityBoonConditionNotMet { get; set; }
@@ -27,13 +28,15 @@ public class Card
 	public string HiddenCardText { get; set; }
 
 	public bool IsShown { get; set; }
+	public bool HasAttacked { get; set; }
 
 public Card(string line)
 	{
 		List<string> lineData = line.Split(",").ToList();
 
 		IsShown = true;
-		Name = PadBoth(lineData[8],14);
+		HasAttacked = false;
+        Name = lineData[8];
 
 		Faction _faction = new Faction();
 		_ = Enum.TryParse<Faction>(lineData[2], true, out _faction);
@@ -46,6 +49,7 @@ public Card(string line)
 		AttackValue = Convert.ToInt32(lineData[3]);
 		ForceValue = Convert.ToInt32(lineData[4]);
 		Category = PadBoth(lineData[5],22);
+		IsUnique = Convert.ToBoolean(lineData[10]);
 		
 		Ability = lineData[6];
 		List<string> abilityLines = new List<string>();
@@ -69,7 +73,7 @@ public Card(string line)
 			}
 		}
 
-		Reward = lineData[7];
+		Reward = lineData[11];
 		List<string> rewardLines = new List<string>();
 
 		if (Reward.Contains("NULL"))
@@ -93,7 +97,7 @@ public Card(string line)
 		ShownCardText = 
 			 $"  _________________________  \r\n"+
 			 $" /                         \\ \r\n"+
-			 $"/    {Name}    H{CardCost}   \\\r\n"+
+			 $"/    {PadBoth(Name,14)}    H{CardCost}   \\\r\n"+
 			 $"|                           |\r\n"+
 			 $"|    R  [{ResourceValue}]     [{PadBoth((Faction.ToString()),7)}]   |\r\n"+
 			 $"|    χ  [{AttackValue}]                 |\r\n"+
@@ -120,7 +124,7 @@ public Card(string line)
 				HiddenCardText =
 			 $"  _ _ _ _ _ _ _ _ _ _ _ _ _  \r\n" +
 			 $"                             \r\n" +
-			 $"/    {Name}    H{CardCost}   \\\r\n" +
+			 $"/    {PadBoth(Name, 14)}    H{CardCost}   \\\r\n" +
 			 $"                             \r\n" +
 			 $"|    R  [{ResourceValue}]     [{Faction}]     |\r\n" +
 			 $"     χ  [{AttackValue}]                  \r\n" +

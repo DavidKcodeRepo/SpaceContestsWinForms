@@ -34,4 +34,19 @@ namespace SpaceContest
 		Rebel,
 		Neutral
 	}
+
+	public enum Category
+	{
+		Transport,
+		Vehicle,
+		Trooper,
+		Scoundrel,
+		Officer,
+		Fighter,
+		Sith,
+		CapitalShip,
+		Jedi,
+		BountyHunter,
+		BountyHunterDroid
+	}
 }
