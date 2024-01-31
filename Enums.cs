@@ -47,6 +47,5 @@ namespace SpaceContest
 		CapitalShip,
 		Jedi,
 		BountyHunter,
-		BountyHunterDroid
 	}
 }

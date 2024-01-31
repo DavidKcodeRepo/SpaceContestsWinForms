@@ -1026,16 +1026,54 @@ public class Game
         _consoleview.WriteLine($"{ShopDeck.First().Name} was added to the shop!\n");
         ShopDeck.Remove(ShopDeck.First());
 
-        //TODO - give bountyhunter rewards
+		//Give bountyhunter rewards
+		attackerCards.ForEach(x => RewardBountyHunters(x));
 
         //give bounty rewards
         RewardFromBountyTarget(targetCard);
     }
 
-	/// <summary>
-	/// Primary entry point for triggering card abilities.
-	/// </summary>
-	/// <param name="cardIndex"></param>
+    private void RewardBountyHunters(Card card)
+    {
+        if (card.Name == "IG-88")
+		{
+			_player.ExilesAvailable += 1;
+			_consoleview.WriteLine("IG-88 got his bounty! You gain an exile. Write exileHand or exileDiscard to action");
+			return;
+        }
+        if (card.Name == "Dengar")
+		{
+            _player.ResourceAvailable += 2;
+            _consoleview.WriteLine("Dengar got his bounty! You gain 2 resource. Write buyCard to action!");
+            return;
+        } 
+        if (card.Name == "Boba Fett")
+		{
+            _consoleview.WriteLine("Boba Fett got his bounty!");
+			Perk("1D", card);
+            return;
+        }
+		if (card.Name == "Bossk")
+		{
+			int isDarkSide = 1;
+			if(_player.Faction == Faction.Empire) { isDarkSide = -1; }
+			ForceChange(1 * isDarkSide);
+            _consoleview.WriteLine("Bosk got his bounty!");
+			ReportForce();
+            return;
+        }
+		if(card.Name == "Cassian Andor")
+		{
+            _consoleview.WriteLine("Cassian got his bounty! Sucks to be you, opponent discards aren't implemented yet");
+			//todo - that.
+        }
+		return;
+    }
+
+    /// <summary>
+    /// Primary entry point for triggering card abilities.
+    /// </summary>
+    /// <param name="cardIndex"></param>
     private void UseAbility(int cardIndex)
     {
 		string userErrorPrompt;
