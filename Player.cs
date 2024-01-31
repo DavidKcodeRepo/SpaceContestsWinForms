@@ -18,12 +18,14 @@ public class Player
 	public int BaseHitPoints { get; set; }
 	public BaseCard Base { get;set; }
 	public bool IsBaseAbilityAvailable { get; set; }
-	public List<bool> IsHandShown { get; set; }
+	public bool HasCapitalShipShown { get; set; }
+    public bool NextPurchaseToTopOfDeck { get; set; }
+
+    public List<bool> IsHandShown { get; set; }
 	public int ResourceAvailable { get; set; }
 	public int AttackAvailable { get; set; }
 	public int ExilesAvailable { get; set; }
     public int FreePurchasesAvailable { get; set; }
-	public bool NextPurchaseToTopOfDeck { get; set; }
 
     public List<Card> Deck { get; set; } = new List<Card>();
 	public List<Card> Hand { get; set; } = new List<Card>();
@@ -101,6 +103,11 @@ public class Player
 	{
 		for (int i = 0; i < Hand.Count; i++)
 		{
+			Card card = Hand[i];
+			if (card.Category == Category.CapitalShip.ToString())
+			{
+				continue;
+			}
 			DiscardPile.AddRange(Hand);
 			Hand.RemoveAll(item => true);
 		}
@@ -108,14 +115,15 @@ public class Player
 
 	public void FishDiscard(Card card)
 	{
-		// default predicate ensures that all cards are returned for discard fishing (e.g. tatooine, jawa), and is overwritten for cards that fish specifically
-		Predicate<Card> predicate = x => x.Name is string;
+		// predicate used to filter cards for certain cards that trigger this method.
+		// Initial predicate value is chosen to be a fully inclusive filter (it removes none).
+		Predicate<Card> filter = x => x.Name is string;
 
-        if (card.Name == "Milli Falcon") { predicate = x => x.IsUnique == true; }
-        if (card.Name == "AT-AT") { predicate = x => x.Category == Category.Trooper.ToString(); }
-        if (card.Name == "Jabba's Barge") { predicate = x => x.Category == Category.BountyHunter.ToString(); }
+        if (card.Name == "Milli Falcon") { filter = x => x.IsUnique == true; }
+        if (card.Name == "AT-AT") { filter = x => x.Category == Category.Trooper.ToString(); }
+        if (card.Name == "Jabba's Barge") { filter = x => x.Category == Category.BountyHunter.ToString(); }
 
-		List<Card> cardsOfCategory = DiscardPile.FindAll(predicate).ToList(); 
+		List<Card> cardsOfCategory = DiscardPile.FindAll(filter).ToList(); 
 
 		_consoleview.WriteLine("please select a card. Write \"[int]\" to chose a card");
 		for(int i = 0;i < cardsOfCategory.Count;i++ )
@@ -146,6 +154,4 @@ public class Player
     }
 
     #endregion
-
-
 }

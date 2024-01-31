@@ -1,6 +1,8 @@
-﻿namespace SpaceContestsWinForms
-{
-	public class BaseCard
-	{
-	}
-}
+﻿//TODO - implement baseCards
+
+//namespace SpaceContestsWinForms
+//{
+//	public class BaseCard
+//	{
+//	}
+//}

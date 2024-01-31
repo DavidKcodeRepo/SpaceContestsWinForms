@@ -289,7 +289,7 @@ public class Game
                     }
                     else { _consoleview.WriteLine(userErrorPrompt); }
                 }
-				AttackCard(targetIndex, attackerIndexes);
+				AttackShopCard(targetIndex, attackerIndexes);
 
                 break;
             case "useAbility":
@@ -346,10 +346,16 @@ public class Game
 			string optionText = "Reply";
 			for(int i = 0; i < optionCount; i++) { optionText.Concat($"'{i}',"); }
 
-			string prompt = $"That ability comes with choices. {card.Name} has ability: {card.Ability}. Which choice would you like? {optionText}";
+			string prompt = $"That ability comes with choices. {card.Name} has ability: {card.AbilityText}. Which choice would you like? {optionText}";
 			_consoleview.RequestUserInput(PerkOption, prompt, card);
 			return;
 		}
+		//special condition for jabba
+		if(card.Name == "Jabba the Hutt")
+		{
+			_consoleview.WriteLine("You must exile a card from hand to resolve this ability.");
+			_consoleview.RequestUserInput(ExileHand, "Pick a card. Write '1', '2', '3' etc. ", card);
+        }
 		//otherwise, keep going
 		else Perk(boon, card);
 		return;
@@ -592,47 +598,59 @@ public class Game
 		//TODO - write an overload for help(string) for each command
 	}
 
+	/// <summary>
+	/// Showing cards is necessary to use a cards resource/attack value, but some player options require cards not shown.
+	/// </summary>
+	/// <param name="cardIndex"></param>
 	private void ShowCard(int cardIndex)
 	{
 		Card card = _player.Hand[cardIndex];
+		//user input check
+        if (!(cardIndex >= 0 && cardIndex < _player.Hand.Count))
+        {
+            _consoleview.WriteLine($"\n You don't have that card. You have {_player.Hand.Count} cards");
+            return;
+        }
 
-		if (card.IsShown == true)
+        if (card.IsShown == true)
 		{
 			_consoleview.WriteLine($"The {card.Name} is already shown!");
 			return;
 		}
-		if (!(cardIndex >= 0 && cardIndex < _player.Hand.Count))
-		{
-			_consoleview.WriteLine($"\n You don't have that card. You have {_player.Hand.Count} cards");
-			return;
-		}
 
-		//update player resources
+
+		//update player resources of the card. If statements suppress redundant console outputs.
 		if (card.ResourceValue > 0)
 		{
 			_player.ResourceAvailable += card.ResourceValue;
 			_consoleview.WriteLine($"{card.Name} gained {card.ResourceValue} for the {_player.Faction} team. "
 			+ $"\nYou now have {_player.ResourceAvailable} resources!");
 		}
-		//update force
 		if (card.ForceValue > 0)
 		{
 			ForceChange(card.ForceValue);
 			_consoleview.WriteLine($"{card.Name} gained {card.ForceValue} for the {_player.Faction} team. ");
 			ReportForce();
 		}
-		//update attack
 		if (card.AttackValue > 0)
 		{
 			_player.AttackAvailable += card.AttackValue;
 			_consoleview.WriteLine($"{card.Name} is ready to fight! They can attack with {card.AttackValue} strength."
 				+ $"\nYour team has {_player.AttackAvailable} total attack strength.");
 		}
+		if (card.Category == Category.CapitalShip.ToString()) 
+		{ 
+			_player.HasCapitalShipShown = true;
+			_consoleview.WriteLine($"{card.Name} warps into orbit to protect the base!");
+		}
 
 		card.IsShown = true;
 		return;
 	}
-
+	/// <summary>
+	/// This is the normal way of using resources to strengthen player deck.
+	/// </summary>
+	/// <param name="indexToBuy"></param>
 	private void BuyCard(int indexToBuy)
 	{
         //user error handling
@@ -690,6 +708,10 @@ public class Game
 		return;
 	}
 
+	/// <summary>
+	/// Some abilities grant free purchases.
+	/// </summary>
+	/// <param name="indexToBuy"></param>
     private void BuyCardFree(int indexToBuy)
     {
 		//user error handling
@@ -726,9 +748,15 @@ public class Game
         return;
     }
 
+    /// <summary>
+    /// Players can exile from hand or discard depending on ability used. Exiling weak cards strenghtens the player's deck. 
+	/// Sometimes this is a free option, but sometimes a card requires it as part of ability, (Jabba). 
+	/// In second case an overload with (string, card) input is needed to conform to "_player.RequestUserInput" delegate.
+    /// </summary>
+    /// <param name="index"></param>
     private void ExileHand(int index)
     {
-        //user error handling
+        //check user input
         string userErrorPrompt;
         if (index < 0 || index >= _player.Hand.Count)
         {
@@ -753,9 +781,38 @@ public class Game
 
         return;
     }
-    private void ExileDiscard(int index)
+    private void ExileHand(string index, Card exilingCard)
     {
         //user error handling
+        string userErrorPrompt;
+		int.TryParse(index, out int result);
+
+        if (result < 0 || result >= _player.Hand.Count)
+        {
+            userErrorPrompt = $"\nYou must choose a card between 1 and {_player.Hand.Count}";
+            _consoleview.WriteLine(userErrorPrompt);
+            return;
+        }
+        if (_player.ExilesAvailable <= 0)
+        {
+            userErrorPrompt = $"You do not have any exile tokens to exile this card!";
+            _consoleview.WriteLine(userErrorPrompt);
+            return;
+        }
+        Card card = _player.Hand[result];
+
+        //users command is legal in the game rules
+        //remove the card from the game
+
+        _consoleview.WriteLine($"You exiled {card.Name} from your hand");
+        _player.Hand.RemoveAt(result);
+        _player.ExilesAvailable -= 1;
+
+        return;
+    }
+    private void ExileDiscard(int index)
+    {
+        //check user input
         string userErrorPrompt;
         if (index < 0 || index >= _player.DiscardPile.Count)
         {
@@ -781,27 +838,31 @@ public class Game
         return;
     }
 
+	/// <summary>
+	/// Attacking the opponents base contributes to the players final objective.
+	/// </summary>
+	/// <param name="cardIndex"></param>
     private void AttackBase(int cardIndex)
 	{
-		Card card = _player.Hand[cardIndex];
-
+		//check user input
+        if (!(cardIndex >= 0 && cardIndex < _player.Hand.Count))
+        {
+            _consoleview.WriteLine($"\n You don't have that card. You have {_player.Hand.Count} cards");
+            return;
+        }
+        Card card = _player.Hand[cardIndex];
+		//rule: card must be shown in order to attack
 		if (card.IsShown == false)
 		{
 			_consoleview.WriteLine($"You must first show card {cardIndex + 1} to use their attack ability!");
 			return;
 		}
-
+		//rule: card cannot attack twice per round
         if (card.HasAttacked == true)
         {
             _consoleview.WriteLine($"You cannot attack with {card.Name}. This card has already attacked this turn!");
             return;
         }
-
-        if (!(cardIndex >= 0 && cardIndex < _player.Hand.Count))
-		{
-			_consoleview.WriteLine($"\n You don't have that card. You have {_player.Hand.Count} cards");
-			return;
-		}
 
 		_consoleview.WriteLine("You attack the enemy base!");
 		//attack the base
@@ -822,17 +883,61 @@ public class Game
 		}
 	}
 
-    private void AttackCard(int targetIndex, List<int> attackerIndexes)
+	/// <summary>
+	/// Attacking a card in the shop allows the player access to rewards, and denies the other player buying the card.
+	/// </summary>
+	/// <param name="targetIndex"></param>
+	/// <param name="attackerIndexes"></param>
+    private void AttackShopCard(int targetIndex, List<int> attackerIndexes)
     {
+		//check user input
+		string userErrorPrompt;
+        if (targetIndex < 0 || targetIndex >= ShopHand.Count)
+        {
+            userErrorPrompt = $"\nInvalid Order, sir! The first number in attackShop command is the target, and must be between 1 and 6";
+            _consoleview.WriteLine(userErrorPrompt);
+            return;
+        }
+
+		foreach(int attInd in attackerIndexes)
+		{
+			userErrorPrompt = $"\nInvalid Order, sir! The second and onward numbers in attackShop command are our troops, so must be within 1 to your hand Count";
+			if (attInd < 0 || attInd >= _player.Hand.Count)
+			{
+                _consoleview.WriteLine(userErrorPrompt);
+				return;
+            }
+        }
         Card targetCard = ShopHand[targetIndex - 1];
+        //rule: target must be opposite faction
+		if (targetCard.Faction != OpponentFaction)
+        {
+			userErrorPrompt = "Not possible, sir! We cannot attack a Neutral card or a card of our own faction!";
+            _consoleview.WriteLine(userErrorPrompt);
+            return;
+        }
+        //rule: target of a bountyhunt cannot be a capital ship
+        if ( targetCard.Category == Category.CapitalShip.ToString())
+		{
+			userErrorPrompt = $"Not possible, sir! We cannot target a capital ship in a bounty hunt.";
+            _consoleview.WriteLine(userErrorPrompt);
+			return;
+        }
         List<Card> attackerCards = new List<Card>();
+
         foreach (int index in attackerIndexes)
         {
             attackerCards.Add(_player.Hand[index - 1]);
         }
-
+		//rule: captal ships cannot attack a bounty
+		if (attackerCards.Any(x=>x.Category == Category.CapitalShip.ToString()))
+		{
+			_consoleview.WriteLine($"You cannot use a capital ship in a bounty hunt. Choose other cards");
+			return;
+		}
         int attackStrength = attackerCards.Sum(x => x.AttackValue) + attackerCards.Sum(x => x.BonusAttackValue);
 
+        //rule: attacker must provide cardCost value worth of attack strength
         if (attackStrength < targetCard.CardCost)
         {
             _consoleview.WriteLine(
@@ -840,14 +945,8 @@ public class Game
                $"\nYou attacked with {attackerCards.Sum(x => x.AttackValue)}, you need {targetCard.CardCost} strength!");
             return;
         }
-
-        if (targetCard.Faction != OpponentFaction)
-        {
-            _consoleview.WriteLine("You cannot attack a Neutral card or a card of your own faction!");
-            return;
-        }
-
-        // attack is go
+        //rules ok, the attack order commences
+        _consoleview.WriteLine($"\nOk, we're going in!");
 
         foreach (Card card in attackerCards)
         {
@@ -863,32 +962,40 @@ public class Game
         _consoleview.WriteLine($"{ShopDeck.First().Name} was added to the shop!\n");
         ShopDeck.Remove(ShopDeck.First());
 
-        //give bountyhunter rewards
+        //TODO - give bountyhunter rewards
 
-        //give target rewards
+        //give bounty rewards
         RewardFromBountyTarget(targetCard);
     }
+
+	/// <summary>
+	/// Primary entry point for triggering card abilities.
+	/// </summary>
+	/// <param name="cardIndex"></param>
     private void UseAbility(int cardIndex)
     {
-		// check input
+		string userErrorPrompt;
+		// check user input
         if (!(cardIndex >= 0 && cardIndex < _player.Hand.Count))
         {
-            _consoleview.WriteLine($"\n You don't have that card. You have {_player.Hand.Count} cards");
+			userErrorPrompt = $"\nInvalid Order, sir! You must give us a card reference from your hand. Choose from 1 to {_player.Hand.Count}";
+            _consoleview.WriteLine(userErrorPrompt);
             return;
         }
         Card card = _player.Hand[cardIndex];
         if (card.IsShown == false)
         {
-            _consoleview.WriteLine($"You must first show card {cardIndex + 1} to use their ability!");
+            userErrorPrompt = $"\nInvalid Order, sir! You must show card {cardIndex + 1} first to use it's ability.";
+			_consoleview.WriteLine(userErrorPrompt);
             return;
         }
 
-        //review conditional statements on card
+        //review conditional statements on card and action
+
         string condition = card.ConditionForAbilityBoon;
         string awardForConditionMet = card.AbilityBoonConditionMet;
         string awardForConditionNotMet = card.AbilityBoonConditionNotMet;
 
-		//where card is not conditional, the award text is placed in awardForConditionMet, and condition == true
         if (TestCondition(condition))
         {
             ActionBoon(awardForConditionMet, card);
