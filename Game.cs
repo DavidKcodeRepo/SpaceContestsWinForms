@@ -7,56 +7,114 @@ using static System.Windows.Forms.VisualStyles.VisualStyleElement;
 namespace SpaceContest;
 
 /// <summary>
-/// The game keeps track of the states of the decks of cards, hands and discard piles, and manages shuffles.
-/// The game is the primary class that calls action from the player and updates the state of the game to the console.
+/// The game class is the primary class that calls action from the player and updates the state of the game to the console.
+/// The game class also sets up the game by reading the cards from the gameContent.csv and dealing starting hands to the players.
+/// The game class keeps track of the gameState, parses actions and checks legality of moves of current player.
+/// The game class informs the viewconsole class of updates to inform the player.
 /// </summary>
 public class Game
 {
+	/// <summary>
+	/// reference to console view for writing gamestate messages and prompting user interactions
+	/// </summary>
 	private ConsoleView _consoleview;
+	/// <summary>
+	/// reference to player, to action player to handle player-cards.
+	/// </summary>
 	private Player _player;
 
-	#region setup
 
-	///Card decks
+	#region Properties
+
+	/// <summary>
+	/// Game: The deck of unrevealed cards. These cards are drawn to replace cards taken from the shop. 
+	/// Game: Their order is unknown and is the prime source of variation in the game (apart from the player choices).
+	/// </summary>
 	List<Card> ShopDeck { get; set; } = new List<Card>();
+	/// <summary>
+	/// Game: the discard pile is kept as some cards can fish cards from these discards. 
+	/// The discard pile is also used to make a new ShopDeck when the shopDeck is empty and a new card is needed.
+	/// </summary>
 	List<Card> ShopDiscardPile { get; set; } = new List<Card>();
+	/// <summary>
+	/// Game: The ShopHand is the currently available cards to purchase or attack the opponents faction's cards for reward.
+	/// </summary>
 	List<Card> ShopHand { get; set; } = new List<Card>();
+	/// <summary>
+	/// game: The OuterRimPilotDeck is an alternate shop. It contains 10 of the same weak card (the outerRimPilot) but its an alternate option.
+	/// </summary>
 	List<Card> OuterRimPilotDeck { get; set; } = new List<Card>();
-	
+
+	/// <summary>
+	/// Game: the forcebalance is a representation of the force. +ve is with the rebels. -ve is with the Empire. 
+	/// Game: having the forcebalance towards your side is beneficial for many conditions on card abiltiies.
+	/// Game: The forcebalance starts with the rebels.
+	/// </summary>
 	int ForceBalance = 4;
-	int OpponenetBaseHitPoints = 8;
 
+	/// <summary>
+	/// Game: Base hit points represent the health of the opponents base. Reduce to zero to destroy bases.
+	/// Game: Loosing all bases results in victory for the other player.
+	/// TODO- this implementation is a temporary workaround since baseCards are not yet implemented.
+	/// </summary>
+	int OpponentBaseHitPoints = 8;
+
+	/// <summary>
+	/// The faction of the opposite player. Updated each alternating round, many game effects are dependent on which faction is active.
+	/// TODO- this implementation is a temporary workaround until playerFaction choice of Empire is supported.
+	/// </summary>
 	public Faction OpponentFaction;
-	public bool IsPlayerTurn = true;
 
-	//TODO - refactor opponent into a class that extends player.cs
+    /// <summary>
+    /// A boolean that tracks the current player. Currently, the game is planned to be player vs automated opponent.
+    /// TODO - refactor opponent into a class that extends player.cs
+    /// </summary>
+    public bool IsPlayerTurn = true;
+
+	/// <summary>
+	/// The opponents cards remaining.
+	/// </summary>
 	List<Card> OpponentDeck { get; set; } = new List<Card>();
-	List<Card> OpponentHand { get; set; } = new List<Card>();
-	List<Card> OpponentDiscardPile { get; set; } = new List<Card>();
+    /// <summary>
+    /// The opponents current hand.
+    /// </summary>
+    List<Card> OpponentHand { get; set; } = new List<Card>();
+    /// <summary>
+    /// The opponents discard pile.
+    /// </summary>
+    List<Card> OpponentDiscardPile { get; set; } = new List<Card>();
 
-	List<string> CommandStrings = new List<string>(Enum.GetNames(typeof(PlayerCommand)));
+	/// <summary>
+	/// A list of all the possible CommandStrings in the game, used for the help command.
+	/// </summary>
+	List<string> CommandStrings = new List<string>(Enum.GetNames(typeof(PlayerCommand))); 
+	#endregion
 
 	/// <summary>
 	/// settings
 	/// </summary>
 	int GameHandCount = 5;
 	int ShopHandCount = 6;
-
-	/// <summary>
-	/// Constructor to build the game
-	/// </summary>
-	public Game(ConsoleView consoleView)
+    #region setup
+    /// <summary>
+    /// Constructor to build the game.
+    /// </summary>
+    public Game(ConsoleView consoleView)
 	{
 		this._consoleview = consoleView;
 		_player = new Player(_consoleview);
 	}
 
+	/// <summary>
+	/// The inital setup method that reads the card data, deals starting hands and instructs the game to start.
+	/// </summary>
 	public void GameStartup()
 	{
-		//Creates the decks of cards to GameDeck, PlayerDeck & OpponentDeck
-		// & Deals first hand to ShopHand, playerHand, and OpponentHand
+        //Creates the decks of cards to GameDeck, PlayerDeck & OpponentDeck
+        // & Deals first hand to ShopHand, playerHand, and OpponentHand
 
-		List<string> TitleArt = new List<string> {
+        //opening console text
+        List<string> TitleArt = new List<string> {
 
 			"  ____                              ____               _              _        ",
 			" / ___|  _ __    __ _   ___  ___   / ___| ___   _ __  | |_  ___  ___ | |_  ___ ",
@@ -65,19 +123,16 @@ public class Game
 			" |____/ | .__/  \\__,_| \\___|\\___|  \\____|\\___/ |_| |_| \\__|\\___||___/ \\__||___/",
 			"        |_|                                                                    "
 			};
-
-	foreach(string title in TitleArt)
+		foreach(string title in TitleArt)
 		{
 			_consoleview.WriteLine(title);
 		}
-		//Console.WriteLine("this line");
-
-		//(("Let's play some space contests"));
 		_consoleview.WriteLine("______________\n");
 		_consoleview.WriteLine("Getting the deck out the box...");
-		string sourceFile = GlobalConfig.CardData.FullFilePath();
-		List<string> sourceData = sourceFile.LoadFile();
 
+        //read card data and construct the cards
+        string sourceFile = GlobalConfig.CardData.FullFilePath();
+		List<string> sourceData = sourceFile.LoadFile();
 		for (int i = 0; i < sourceData.Count; i++)
 		{
 			string line = sourceData[i];
@@ -85,36 +140,37 @@ public class Game
 			ShopDeck.Add(newCard);
 		}
 
-		_consoleview.WriteLine("Dealing cards to starting positions...");
+        //deal starter cards
+		//note: the gameContent.csv is arranged so the first 30 cards are the cards with specific starting positions.
+        _consoleview.WriteLine("Dealing cards to starting positions...");
 		OpponentDeck.AddRange((ShopDeck.GetRange(0, 10)));
 		_player.Deck.AddRange((ShopDeck.GetRange(10, 10)));
 		OuterRimPilotDeck.AddRange((ShopDeck.GetRange(20, 10)));
 
 		ShopDeck.RemoveRange(0, 30);
 
-		//set up factions
+		//assign factions
 		_player.Faction = Faction.Rebel;
 		if (_player.Faction == Faction.Rebel) { OpponentFaction = Faction.Empire; }
 		if (_player.Faction == Faction.Empire) { OpponentFaction = Faction.Rebel; }
 
-		//deal starter cards
+		//shuffle the starting decks
 		_consoleview.WriteLine("Shuffling the galaxy, player and opponent decks...");
 		OpponentDeck = OpponentDeck.OrderBy(x => Random.Shared.Next()).ToList();
 		_player.Deck = _player.Deck.OrderBy(x => Random.Shared.Next()).ToList();
 		ShopDeck = ShopDeck.OrderBy(x => Random.Shared.Next()).ToList();
-
 		_consoleview.WriteLine("Dealing hand to player and opponent...");
-
-		//TODO - make choosing empire team an available choice
 
 		//give out starter hands
 		for (int i = 0; i < GameHandCount; i++)
 		{
-			_player.Deck.First().IsShown = false;
+            _consoleview.WriteLine("Dealing cards to the player!...");
+            _player.Deck.First().IsShown = false;
 			_player.Hand.Add(_player.Deck.First());
 			_player.Deck.Remove(_player.Deck.First());
 
-			OpponentDeck.First().IsShown = false;
+            _consoleview.WriteLine("Dealing cards to the opponent!...");
+            OpponentDeck.First().IsShown = false;
 			OpponentHand.Add(OpponentDeck.First());
 			OpponentDeck.Remove(OpponentDeck.First());
 		}
@@ -143,7 +199,7 @@ public class Game
 	{
 		//reset non-persistant player stats, non persistant cards effects are reset at drawNewHand
 		_player.ExilesAvailable = 0;
-		_player.FreePurchasesAvailable = 0;
+		_player.FreePurchasesOfFactionAvailable = 0;
 		_player.ResourceAvailable = 0;
 		_player.DiscardHand();
 		_player.DrawNewHand();
@@ -285,11 +341,11 @@ public class Game
                 {
                     if (int.TryParse(userInputParts[i], out int attackerIndex))
 					{
-                        attackerIndexes.Add(attackerIndex);
+                        attackerIndexes.Add(attackerIndex - 1);
                     }
                     else { _consoleview.WriteLine(userErrorPrompt); }
                 }
-				AttackShopCard(targetIndex, attackerIndexes);
+				AttackShopCard(targetIndex - 1, attackerIndexes);
 
                 break;
             case "useAbility":
@@ -473,12 +529,12 @@ public class Game
                     _consoleview.WriteLine($"{card.Name} contributed resource, you now have {_player.ResourceAvailable} resources to spend");
                     break;
                 case "S":
-                    _player.FreePurchasesAvailable += kvp.Value;
-                    _consoleview.WriteLine($"{card.Name} gained a free purchase, you now have {_player.FreePurchasesAvailable} free purchases to make");
+                    _player.FreePurchasesOfFactionAvailable += kvp.Value;
+                    _consoleview.WriteLine($"{card.Name} gained a free purchase, you now have {_player.FreePurchasesOfFactionAvailable} free purchases to make");
                     break;
                 case "T":
 					_player.NextPurchaseToTopOfDeck = true;
-                    _consoleview.WriteLine($"{card.Name} gained a free purchase, you now have {_player.FreePurchasesAvailable} free purchases to make");
+                    _consoleview.WriteLine($"{card.Name} gained a free purchase, you now have {_player.FreePurchasesOfFactionAvailable} free purchases to make");
                     break;
                 case "X":
                     _consoleview.WriteLine($"{card.Name} was exiled!");
@@ -574,7 +630,7 @@ public class Game
                     ReportForce();
                     break;
                 case "P":
-                    _player.FreePurchasesAvailable += kvp.Value;
+                    _player.FreePurchasesOfFactionAvailable += kvp.Value;
                     _consoleview.WriteLine($"\n You may purchase {kvp.Value} cards from the shop. Type FreePurchase [int] to action");
                     break;
                 case "R":
@@ -722,7 +778,7 @@ public class Game
             userErrorPrompt = $"\nYou must choose a card between 1 and {ShopHand.Count}";
             _consoleview.WriteLine(userErrorPrompt);
         }
-		if (_player.FreePurchasesAvailable < 1)
+		if (_player.FreePurchasesOfFactionAvailable < 1)
 		{
 			userErrorPrompt = "\nYou do not have a Free Purchase token available";
 			_consoleview.WriteLine(userErrorPrompt);
@@ -739,8 +795,8 @@ public class Game
         ShopHand.RemoveAt(indexToBuy - 1);
         _player.DiscardPile.Add(cardToBuy);
         _consoleview.WriteLine($"You bought {cardToBuy.Name} for free! The card is in your discard pile. \n");
-        _player.FreePurchasesAvailable -= 1;
-        _consoleview.WriteLine($"You have {_player.FreePurchasesAvailable} free purchases remaining.\n");
+        _player.FreePurchasesOfFactionAvailable -= 1;
+        _consoleview.WriteLine($"You have {_player.FreePurchasesOfFactionAvailable} free purchases remaining.\n");
 
         ShopHand.Insert(indexToBuy - 1, ShopDeck.First());
         _consoleview.WriteLine($"{ShopDeck.First().Name} was added to the shop!\n");
@@ -869,16 +925,16 @@ public class Game
 		//TODO - implement capitalShip defence logic
 		if (card.AttackValue > 0)
 		{
-			OpponenetBaseHitPoints -= card.AttackValue;
+			OpponentBaseHitPoints -= card.AttackValue;
 			_consoleview.WriteLine($"{card.Name} attacked the Empire base with {card.AttackValue} strength.");
-			if (OpponenetBaseHitPoints < 0)
+			if (OpponentBaseHitPoints < 0)
 			{
 				_consoleview.WriteLine($"You have destroyed the enemy base.");
 				IsGameOver = true;
 			}
 			else
 			{
-				_consoleview.WriteLine($"The Empire base was weakened and has {OpponenetBaseHitPoints} health left");
+				_consoleview.WriteLine($"The Empire base was weakened and has {OpponentBaseHitPoints} health left");
 			}
 		}
 	}
@@ -908,41 +964,49 @@ public class Game
 				return;
             }
         }
-        Card targetCard = ShopHand[targetIndex - 1];
+        Card targetCard = ShopHand[targetIndex];
         //rule: target must be opposite faction
 		if (targetCard.Faction != OpponentFaction)
         {
-			userErrorPrompt = "Not possible, sir! We cannot attack a Neutral card or a card of our own faction!";
+			userErrorPrompt = $"Not possible, sir! We won't attack a Neutral card or a friendly {_player.Faction} card!";
             _consoleview.WriteLine(userErrorPrompt);
             return;
         }
         //rule: target of a bountyhunt cannot be a capital ship
         if ( targetCard.Category == Category.CapitalShip.ToString())
 		{
-			userErrorPrompt = $"Not possible, sir! We cannot target a capital ship in a bounty hunt.";
+			userErrorPrompt = $"Not possible, sir! We won't go after a capital ship in a bounty hunt- that's just suicide!";
             _consoleview.WriteLine(userErrorPrompt);
 			return;
         }
-        List<Card> attackerCards = new List<Card>();
+
+		//build the attack force
+		List<Card> attackerCards = new List<Card>();
 
         foreach (int index in attackerIndexes)
         {
-            attackerCards.Add(_player.Hand[index - 1]);
+            attackerCards.Add(_player.Hand[index]);
         }
+
 		//rule: captal ships cannot attack a bounty
 		if (attackerCards.Any(x=>x.Category == Category.CapitalShip.ToString()))
 		{
-			_consoleview.WriteLine($"You cannot use a capital ship in a bounty hunt. Choose other cards");
+            userErrorPrompt	= $"Not possible, sir! We cannot steer our capital ship to chase that target!";
+
+            _consoleview.WriteLine(userErrorPrompt);
 			return;
 		}
         int attackStrength = attackerCards.Sum(x => x.AttackValue) + attackerCards.Sum(x => x.BonusAttackValue);
 
+		//rule: rodian gunslingers gain attack strength in a bountyhunt prior to strength check
+		attackerCards.Where(x => x.Name == "Rodi Gunslingr").ToList().ForEach(x => x.BonusAttackValue += 2);
+
         //rule: attacker must provide cardCost value worth of attack strength
         if (attackStrength < targetCard.CardCost)
         {
-            _consoleview.WriteLine(
-                "\nYour attackers have insufficient strength to beat this target" +
-               $"\nYou attacked with {attackerCards.Sum(x => x.AttackValue)}, you need {targetCard.CardCost} strength!");
+			userErrorPrompt = $"Not possible, sir! We need more forces to beat that target." +
+					$"\n That order sends {attackerCards.Sum(x => x.AttackValue)} attack strength, we need {targetCard.CardCost} strength!";
+			_consoleview.WriteLine(userErrorPrompt);
             return;
         }
         //rules ok, the attack order commences
@@ -950,15 +1014,15 @@ public class Game
 
         foreach (Card card in attackerCards)
         {
-            card.HasAttacked = true;
+			card.HasAttacked = true;
         }
 
-        ShopHand.RemoveAt(targetIndex - 1);
+        ShopHand.RemoveAt(targetIndex);
         ShopDiscardPile.Add(targetCard);
         _consoleview.WriteLine($"You killed {targetCard.Name}. The card has been moved to the shop discard pile. \n");
         _consoleview.WriteLine($"You have {_player.ResourceAvailable} resource remaining.\n");
 
-        ShopHand.Insert(targetIndex - 1, ShopDeck.First());
+        ShopHand.Insert(targetIndex, ShopDeck.First());
         _consoleview.WriteLine($"{ShopDeck.First().Name} was added to the shop!\n");
         ShopDeck.Remove(ShopDeck.First());
 
@@ -1091,7 +1155,7 @@ public class Game
 
 	private void ReportOpponentBase()
 	{
-		_consoleview.WriteLine($"The opponents base now has {OpponenetBaseHitPoints} HP");
+		_consoleview.WriteLine($"The opponents base now has {OpponentBaseHitPoints} HP");
 	}
 
 	private void ReportBase()
@@ -1121,8 +1185,8 @@ public class Game
 	}
 	void OpponentBaseHealthChange(int delta)
 	{
-		OpponenetBaseHitPoints+= delta;
-		OpponenetBaseHitPoints = Math.Clamp(OpponenetBaseHitPoints, 0, 8);
+		OpponentBaseHitPoints+= delta;
+		OpponentBaseHitPoints = Math.Clamp(OpponentBaseHitPoints, 0, 8);
 	}
 
 
