@@ -15,7 +15,6 @@ namespace SpaceContest
 		buyCard,
 		help,
 		goAllIn
-
 		//DiscardCard,
 		//Purchase (shopcard),
 		//Discard (handcard),
@@ -27,7 +26,6 @@ namespace SpaceContest
 		//FishDiscard(),
 		//CountEnemyCards(),
 		//PeekShop(),
-
 	}
 
 	public enum Faction
@@ -35,5 +33,19 @@ namespace SpaceContest
 		Empire,
 		Rebel,
 		Neutral
+	}
+
+	public enum Category
+	{
+		Transport,
+		Vehicle,
+		Trooper,
+		Scoundrel,
+		Officer,
+		Fighter,
+		Sith,
+		CapitalShip,
+		Jedi,
+		BountyHunter,
 	}
 }
