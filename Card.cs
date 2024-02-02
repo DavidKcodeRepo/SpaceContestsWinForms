@@ -63,6 +63,10 @@ public class Card
 	// note: A round-tracker stat to check if card has attacked (attackBase / attackShopCard game actions).
 	// game: cards cannot attack twice per round.
 	public bool HasAttacked { get; set; } = false; 
+	/// <summary>
+	/// game: cards of category "capital ships" can take damage in each round, and so must track this stat through rounds
+	/// </summary>
+	public int HPRemaining { get; set; }
 	#endregion
 
 	/// <summary>

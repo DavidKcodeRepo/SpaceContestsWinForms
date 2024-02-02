@@ -73,11 +73,13 @@ public class Player
 	/// game: the player has a hand of cards. Usually 5.
 	/// </summary>
 	public List<Card> Hand { get; set; } = new List<Card>();
-	/// <summary>
-	/// game: After a round, the player discards cards. 
-	/// game: The discard pile can be accessed to gain specific cards, but will be normally recycled to remake the deck when empty.
-	/// </summary>
-	public List<Card> DiscardPile { get; set; } = new List<Card>(); 
+    public List<Card> CapitalShipHand { get; set; } = new List<Card>();
+
+    /// <summary>
+    /// game: After a round, the player discards cards. 
+    /// game: The discard pile can be accessed to gain specific cards, but will be normally recycled to remake the deck when empty.
+    /// </summary>
+    public List<Card> DiscardPile { get; set; } = new List<Card>(); 
 	#endregion
 
 	public Player(ConsoleView consoleview)
@@ -170,14 +172,16 @@ public class Player
 	{
 		for (int i = 0; i < Hand.Count; i++)
 		{
-			Card card = Hand[i];
-			if (card.Category == Category.CapitalShip.ToString())
-			{
-				continue;
-			}
+			Card card = Hand[i]; 
 			card.BonusAttackValue = 0;
 			DiscardPile.AddRange(Hand);
 			Hand.RemoveAll(item => true);
+		}
+
+		for (int i =0; i < CapitalShipHand.Count;)
+		{
+			Card card = CapitalShipHand[i];
+			card.HasAttacked = false;
 		}
 	}
 
