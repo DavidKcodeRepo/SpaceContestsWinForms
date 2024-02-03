@@ -54,7 +54,21 @@ namespace SpaceContestsWinForms
 			return;
 		}
 
-		private string GetLastLine(string text)
+		/// <summary>
+		/// Overload where user input requirement doesn't come from a card. e.g. user needs to pick a new base
+		/// </summary>
+		/// <param name="method"></param>
+		/// <param name="prompt"></param>
+        public void RequestUserInput(MethodRequestingInput method, string prompt)
+        {
+            rtbConsole.AppendText(prompt);
+            rtbConsole.AppendText(Environment.NewLine);
+            currentPendingMethod = method;
+            currentCard = null;
+            return;
+        }
+
+        private string GetLastLine(string text)
 		{
 			string[] lines = text.Split('\n');
 			return lines.Length > 0 ? lines[lines.Length - 1].Trim() : "";

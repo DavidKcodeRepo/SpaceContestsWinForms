@@ -25,4 +25,6 @@ public static class FileIO
 public static class GlobalConfig
 {
 	public const string CardData = "CardTables.csv";
+    public const string BaseCardData = "BaseCardTables.csv";
+
 }

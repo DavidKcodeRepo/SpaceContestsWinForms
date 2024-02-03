@@ -2,6 +2,7 @@
 using System;
 using System.Reflection.Metadata.Ecma335;
 using System.Text.RegularExpressions;
+using System.Xml.Linq;
 using static System.Windows.Forms.VisualStyles.VisualStyleElement;
 
 namespace SpaceContest;
@@ -53,6 +54,7 @@ public class Game
     /// Game: The forcebalance starts with the rebels.
     /// </summary>
     int ForceBalance = 4;
+    int PlayerForceSideModifier = 1; //TODO - expand empire choice to player
 
     /// <summary>
     /// Game: Base hit points represent the health of the opponents base. Reduce to zero to destroy bases.
@@ -64,9 +66,16 @@ public class Game
     /// <summary>
     /// Game: Base hit points represent the health of the opponents base. Reduce to zero to destroy bases.
     /// Game: Loosing all bases results in victory for the other player.
-    /// TODO- this implementation is a temporary workaround since baseCards are not yet implemented.
     /// </summary>
-    int OpponentBaseHitPoints = 8;
+    BaseCard OpponentCurrentBase;
+    /// <summary>
+    /// The available bases an opponent has to select from after their current base is destroyed.
+    /// </summary>
+    List<BaseCard> OpponentRemainingBases;
+    /// <summary>
+    /// The collection of Bases destroyed by the player.
+    /// </summary>
+    List<BaseCard> OpponentVictoryPile;
 
     /// <summary>
     /// The faction of the opposite player. Updated each alternating round, many game effects are dependent on which faction is active.
@@ -88,7 +97,7 @@ public class Game
     /// The opponents current hand.
     /// </summary>
     List<Card> OpponentHand { get; set; } = new List<Card>();
-    List<Card> OpponenetCapitalShipHand { get; set; } = new List<Card>();
+    List<Card> OpponentCapitalShipHand { get; set; } = new List<Card>();
     /// <summary>
     /// The opponents discard pile.
     /// </summary>
@@ -140,17 +149,35 @@ public class Game
         _consoleview.WriteLine("______________\n");
         _consoleview.WriteLine("Getting the deck out the box...");
 
-        //read card data and construct the cards
-        string sourceFile = GlobalConfig.CardData.FullFilePath();
-        List<string> sourceData = sourceFile.LoadFile();
-        for (int i = 0; i < sourceData.Count; i++)
+        //read card data and put cards in the shop
+        string cardSourceFile = GlobalConfig.CardData.FullFilePath();
+        List<string> cardSourceData = cardSourceFile.LoadFile();
+        for (int i = 0; i < cardSourceData.Count; i++)
         {
-            string line = sourceData[i];
+            string line = cardSourceData[i];
             Card newCard = new Card(line);
             ShopDeck.Add(newCard);
         }
 
+        //read bases to a temp stack of bases to distribute
+        string baseCardSourceFile = GlobalConfig.BaseCardData.FullFilePath();
+        List<string> baseCardSourceData = baseCardSourceFile.LoadFile();
+
+        List<BaseCard> baseCards = new List<BaseCard>();
+        foreach (string line in baseCardSourceData)
+        {
+            BaseCard newBaseCard = new BaseCard(line);
+            baseCards.Add(newBaseCard);
+        }
+
         //deal starter cards
+        _player.CurrentBase = baseCards[0];
+        _player.RemainingBaseCards = baseCards.GetRange(1, 9);
+        OpponentCurrentBase = baseCards[10];
+        OpponentRemainingBases = baseCards.GetRange(11, 9);
+
+        _player.CurrentBase.IsAbilityAvailable = false;
+
         //note: the gameContent.csv is arranged so the first 30 cards are the cards with specific starting positions.
         _consoleview.WriteLine("Dealing cards to starting positions...");
         OpponentDeck.AddRange((ShopDeck.GetRange(0, 10)));
@@ -203,22 +230,51 @@ public class Game
     #region gameLoop
 
     bool IsGameOver = false;
+    int VictoryPileCountToWin = 4;
 
 
     public void DoGameRound()
     {
         //reset non-persistant player stats, non persistant cards effects are reset at drawNewHand
+
+        if (_player.CurrentBase.RemainingHitPoints <= 0)
+        {
+            OpponentRemainingBases.Add(_player.CurrentBase);
+            _player.CurrentBase = null;
+            _consoleview.WriteLine($"\nYour base has been destroyed. Your opponent has destroyed {OpponentVictoryPile.Count} bases so far");
+            if (OpponentVictoryPile.Count >= VictoryPileCountToWin)
+            {
+                IsGameOver = true;
+            }
+        }
         _player.ExilesAvailable = 0;
         _player.FreePurchasesOfFactionAvailable = 0;
         _player.ResourceAvailable = 0;
+        PlayerForceSideModifier = (_player.Faction == Faction.Empire) ? -1 : 1;
         _player.DiscardHand();
         _player.DrawNewHand();
+        _consoleview.WriteLine("\nHere is your hand:\n");
+        DisplayCards(_player.Hand);
+        _consoleview.WriteLine("\nHere is the shop hand:\n");
+        DisplayCards(ShopHand);
+        if (_player.CurrentBase == null)
+        {
+            _player.ChooseNewBase();
+            if (_player.CurrentBase.IsAbilityRevealDependent)
+            {
+                UseBaseAbility(_player);
+                _player.CurrentBase.IsAbilityAvailable = false;
+            }
+        }
+        else
+        {
+            if (!_player.CurrentBase.IsAbilityRevealDependent) { _player.CurrentBase.IsAbilityAvailable = true; }
+        }
         IsPlayerTurn = false;
         DoOpponentTurn();
         IsPlayerTurn = true;
         return;
     }
-
     private void DoOpponentTurn()
     {
         //TODO - make the opponent do something...
@@ -283,8 +339,15 @@ public class Game
             case "peekShopDiscards":
                 DisplayCardsShort(ShopDiscardPile);
                 break;
+            case "peekBase":
+                List<BaseCard> baseList = new List<BaseCard> { _player.CurrentBase };
+                DisplayBaseCards(baseList);
+                break;
             case "reportForce":
                 ReportForce();
+                break;
+            case "reportBases":
+                ReportBases();
                 break;
             case "buyCard":
                 userErrorPrompt = "\nI didn't understand. To buy a Card from shop write \"buyCard [int]\" ";
@@ -474,7 +537,7 @@ public class Game
                     _consoleview.WriteLine($"{card.Name} now has {kvp.Value} Attack Strength");
                     break;
                 case "B":
-                    OpponentBaseHealthChange(kvp.Value * -1);
+                    OpponentCurrentBase.HPChange(kvp.Value * -1);
                     _consoleview.WriteLine($"{card.Name} Damaged the enemy base!");
                     ReportOpponentBase();
                     break;
@@ -489,12 +552,7 @@ public class Game
                     _consoleview.WriteLine($"\nYou may exile {kvp.Value} cards from your hand or discard pile. Type exile [int] or exileDiscard [int] to action");
                     break;
                 case "F": //TODO assign current player force alignment at start of turn.
-                    int flipDarkSide = 1;
-                    if (_player.Faction == Faction.Empire)
-                    {
-                        flipDarkSide = -1;
-                    }
-                    ForceChange(kvp.Value * flipDarkSide);
+                    ForceChange(kvp.Value * PlayerForceSideModifier);
                     _consoleview.WriteLine($"{card.Name} has the force with them!");
                     ReportForce();
                     break;
@@ -508,7 +566,7 @@ public class Game
                     }
                     break;
                 case "H":
-                    PlayerBaseHealthChange(kvp.Value);
+                    _player.CurrentBase.HPChange(kvp.Value);
                     _consoleview.WriteLine($"{card.Name} Did repairs to the base!");
                     ReportBase();
                     break;
@@ -570,12 +628,7 @@ public class Game
 
                 break;
             case "CF":
-                int flipDarkSide = 1;
-                if (_player.Faction == Faction.Empire)
-                {
-                    flipDarkSide = -1;
-                }
-                if (ForceBalance * flipDarkSide > 0 ? output = true : output = false) ;
+                if (ForceBalance * PlayerForceSideModifier > 0 ? output = true : output = false) ;
                 break;
             case "CG":
                 Card nextGalaxyCard = ShopDeck.First();
@@ -630,12 +683,7 @@ public class Game
                     _consoleview.WriteLine($"\nYou may exile {kvp.Value} cards from your hand or discard pile. Type Exile [int] to action");
                     break;
                 case "F":
-                    int flipDarkSide = 1;
-                    if (_player.Faction == Faction.Empire)
-                    {
-                        flipDarkSide = -1;
-                    }
-                    ForceChange(1 * flipDarkSide);
+                    ForceChange(1 * PlayerForceSideModifier);
                     _consoleview.WriteLine($"\n A disturbance in the force. you gained {kvp.Value}");
                     ReportForce();
                     break;
@@ -650,8 +698,6 @@ public class Game
             }
         }
     }
-
-
 
     #endregion
     #region playerCommands
@@ -796,7 +842,7 @@ public class Game
             _consoleview.WriteLine(userErrorPrompt);
         }
         Card cardToBuy = _player.Hand[indexToBuy];
-        if (cardToBuy.Faction != _player.Faction)
+        if (_player.Faction != cardToBuy.Faction)
         {
             userErrorPrompt = "\nYou must buy a card of your faction";
             _consoleview.WriteLine(userErrorPrompt);
@@ -811,6 +857,36 @@ public class Game
         _consoleview.WriteLine($"You have {_player.FreePurchasesOfFactionAvailable} free purchases remaining.\n");
 
         ShopHand.Insert(indexToBuy - 1, ShopDeck.First());
+        _consoleview.WriteLine($"{ShopDeck.First().Name} was added to the shop!\n");
+        ShopDeck.Remove(ShopDeck.First());
+        return;
+    }
+
+    private void BaseBuyCard(string indexToBuy, Card card)
+    {
+        //user error handling
+        string userErrorPrompt;
+        int index = int.Parse(indexToBuy) - 1;
+
+        if (index! >= 0 && index < ShopHand.Count)
+        {
+            userErrorPrompt = $"\nYou must choose a card between 1 and {ShopHand.Count}";
+            _consoleview.WriteLine(userErrorPrompt);
+        }
+        Card cardToBuy = ShopHand[index];
+        if (OpponentFaction != cardToBuy.Faction)
+        {
+            userErrorPrompt = "\nYou must buy a card of your faction or neutral";
+            _consoleview.WriteLine(userErrorPrompt);
+        }
+
+        //users command is legal in the game rules
+        //take card from shop to players hand, replace shop.
+        ShopHand.RemoveAt(index);
+        _player.Hand.Add(cardToBuy);
+        _consoleview.WriteLine($"You bought {cardToBuy.Name} for free! The card is in your hand. \n");
+
+        ShopHand.Insert(index, ShopDeck.First());
         _consoleview.WriteLine($"{ShopDeck.First().Name} was added to the shop!\n");
         ShopDeck.Remove(ShopDeck.First());
         return;
@@ -939,26 +1015,38 @@ public class Game
         {
             OpponentHand.Where(x => x.Category == Category.CapitalShip.ToString());
             // console opponent has captial ships blocking the base. Would you like to attack a ship.
-            // peekCapitalShips
-            // attack capital ship method with rollover damage
-            //
-
+            DisplayCardsShort(OpponentCapitalShipHand);
+            _consoleview.WriteLine("Opponent has captial ships blocking the base. Would you like to attack a ship?");
+            _consoleview.RequestUserInput(AttackCapitalShip, "Opponent has captial ships blocking the base. Would you like to attack a ship?", card);
         }
         else
         //TODO - implement capitalShip defence logic
         if (card.AttackValue > 0)
         {
-            OpponentBaseHitPoints -= card.AttackValue;
+
+            OpponentCurrentBase.RemainingHitPoints -= card.AttackValue;
             _consoleview.WriteLine($"{card.Name} attacked the Empire base with {card.AttackValue} strength.");
-            if (OpponentBaseHitPoints < 0)
+            if (OpponentCurrentBase.RemainingHitPoints < 0)
             {
                 _consoleview.WriteLine($"You have destroyed the enemy base.");
                 IsGameOver = true;
             }
             else
             {
-                _consoleview.WriteLine($"The Empire base was weakened and has {OpponentBaseHitPoints} health left");
+                _consoleview.WriteLine($"The Empire base was weakened and has {OpponentCurrentBase.RemainingHitPoints} health left");
             }
+        }
+    }
+
+    public void AttackCapitalShip(string userInput, Card card)
+    {
+        //TODO - add an optout
+        int index = int.Parse(userInput);
+        int totalattack = (card.AttackValue + card.BonusAttackValue);
+
+        if (OpponentCapitalShipHand[index].HPRemaining < totalattack)
+        {
+            int overkill = totalattack - OpponentCapitalShipHand[index].HPRemaining;
         }
     }
 
@@ -1078,9 +1166,7 @@ public class Game
         }
         if (card.Name == "Bossk")
         {
-            int isDarkSide = 1;
-            if (_player.Faction == Faction.Empire) { isDarkSide = -1; }
-            ForceChange(1 * isDarkSide);
+            ForceChange(1 * PlayerForceSideModifier);
             _consoleview.WriteLine("Bosk got his bounty!");
             ReportForce();
             return;
@@ -1131,8 +1217,68 @@ public class Game
         }
         return;
     }
+    private void UseBaseAbility(Player player)
+    {
+        if (_player.CurrentBase.Name == "Mon Cala" || _player.CurrentBase.Name == "Corellia")
+        {
+            DisplayCards(ShopHand);
+            _player.FreePurchasesOfFactionAvailable += 1;
+            _consoleview.RequestUserInput(BaseBuyCard, "which card would you like to buy? Write: \"[int]\"");
+            return;
+        }
 
+        if(_player.CurrentBase.Name == "Mustafar" || _player.CurrentBase.Name == "Alderaan")
+        {
+            ForceChange(4 * PlayerForceSideModifier);
+            ReportForce();
+            return;
+        }
+        if (_player.CurrentBase.Name == "Kessel" || _player.CurrentBase.Name == "Dagobah")
+        {
+            _player.ExilesAvailable += 3; //TODO enforce this happening at start of turn
+            _consoleview.WriteLine("The programe doesn't have the ability to enforce you doing this right now, but pretty please do it...");
+            ReportForce();
+            return;
+        }
+        if (_player.CurrentBase.Name == "Tatooine")
+        {
+            DisplayCardsShort(ShopDiscardPile);
+            _consoleview.RequestUserInput(TatooineSwapRequestShopIndex, "which card would you like to put in the galaxy row? Write: \"[int]\"");
+            return;
+        }
+        if (_player.CurrentBase.Name == "Rodia")
+        {
+            List<Card> Rebels = ShopHand.FindAll(x => x.Faction == Faction.Rebel);
 
+            Rebels.ForEach(x =>
+            {
+                OpponentCurrentBase.HPChange(-1);
+                ShopDiscardPile.Add(x);
+                ShopHand.Remove(x);
+            });
+            return;
+        }
+    }
+
+    public void TatooineSwapRequestShopIndex(string userInput, Card nullC)
+    {
+        int index = int.Parse(userInput);
+        Card cardToFish = ShopDiscardPile[index];
+        DisplayCards(ShopHand);
+        _consoleview.RequestUserInput(TatooineSwap, "Which card would you like to put in galaxy discard pile? Write \"[int]\"", cardToFish);
+    }
+    public void TatooineSwap(string userInput, Card card)
+    {
+        int index = int.Parse(userInput);
+        _player.ResourceAvailable += 1;
+        ReportResource(_player);
+        Card cardOut = ShopHand[index];
+        ShopHand.Remove(cardOut);
+        ShopHand.Insert(index, card);
+
+        ShopDiscardPile.Add(cardOut);
+        ShopDiscardPile.Remove(card);
+    }
 
     #endregion
     #region ConsoleHelpers 
@@ -1176,6 +1322,38 @@ public class Game
 
         foreach (string line in lines) { _consoleview.WriteLine(line); }
     }
+    void DisplayBaseCards(List<BaseCard> hand)
+    {
+        _consoleview.WriteLine($"\n");
+        int cardNo = 0;
+        int lineNo = 0;
+        List<string> lines = new List<string>();
+
+        foreach (BaseCard card in hand)
+        {
+            using (StringReader reader = new StringReader(card.DisplayText()))
+            {
+                string line = string.Empty;
+
+                while (line != null)
+                {
+                    line = reader.ReadLine();
+
+                    if (lineNo < lines.Count)
+                    {
+                        lines[lineNo] += "   " + line;
+                        lineNo++;
+                    }
+                    else { lines.Add(line); lineNo++; }
+                }
+            }
+            lineNo = 0;
+            cardNo++;
+        }
+
+        foreach (string line in lines) { _consoleview.WriteLine(line); }
+    }
+
 
     void DisplayCardsShort(List<Card> hand)
     {
@@ -1210,27 +1388,32 @@ public class Game
         }
         if (ForceBalance < 0)
         {
-            _consoleview.WriteLine($"The force is with the Empire with +{Math.Abs(ForceBalance)}");
+            _consoleview.WriteLine($"The force is with the Empire with + {Math.Abs(ForceBalance)}");
         }
+    }
+
+    private void ReportBases()
+    {
+        ReportBase();
+        ReportOpponentBase();
     }
 
     private void ReportOpponentBase()
     {
-        _consoleview.WriteLine($"The opponents base now has {OpponentBaseHitPoints} HP");
+        _consoleview.WriteLine($"The opponents base at {OpponentCurrentBase.Name} now has {OpponentCurrentBase.RemainingHitPoints} HP");
     }
 
     private void ReportBase()
     {
         //TODO capital ships
-        _consoleview.WriteLine($"Your base now has {_player.BaseHitPoints} HP");
+        _consoleview.WriteLine($"Your base at {_player.CurrentBase.Name} now has {_player.CurrentBase.RemainingHitPoints} HP");
+        _consoleview.WriteLine($"Your base ability is {(_player.CurrentBase.IsAbilityAvailable ? "" : "not")} available!");
     }
 
     private void ReportResource(Player player)
     {
         _consoleview.WriteLine($"You have {_player.ResourceAvailable} resources available to buy with");
     }
-
-
 
     #endregion
     #region gameStateManagementHelpers
@@ -1239,17 +1422,6 @@ public class Game
         ForceBalance += delta;
         ForceBalance = Math.Clamp(ForceBalance, -4, 4);
     }
-    void PlayerBaseHealthChange(int delta)
-    {
-        _player.BaseHitPoints += delta;
-        _player.BaseHitPoints = Math.Clamp(_player.BaseHitPoints, 0, 8);
-    }
-    void OpponentBaseHealthChange(int delta)
-    {
-        OpponentBaseHitPoints += delta;
-        OpponentBaseHitPoints = Math.Clamp(OpponentBaseHitPoints, 0, 8);
-    }
-
 
     void GameOver()
     {

@@ -26,12 +26,6 @@ public class Player
 
 	#region TrackerStats
 
-	/// <summary>
-	/// The hit points of the current base. When this reaches zero the player loses their current base.
-	/// </summary>
-	public int BaseHitPoints { get; set; }
-
-	/// <summary>
 	/// A tracker stat. 
 	/// game: Some abilities are dependent on presence of player having capital ship. 
 	/// </summary>
@@ -75,6 +69,14 @@ public class Player
 	public List<Card> Hand { get; set; } = new List<Card>();
     public List<Card> CapitalShipHand { get; set; } = new List<Card>();
 
+    public BaseCard CurrentBase { get; set; }
+    public List<BaseCard> RemainingBaseCards { get; set; }
+
+	/// <summary>
+	/// The set of collected bases from the opponent. The player collects bases to win
+	/// </summary>
+	public List<BaseCard> VictoryPile { get; set; }
+
     /// <summary>
     /// game: After a round, the player discards cards. 
     /// game: The discard pile can be accessed to gain specific cards, but will be normally recycled to remake the deck when empty.
@@ -89,8 +91,6 @@ public class Player
 		// assign default starting values
 		// TODO - extend player choice to include Empire
 		this.Faction = Faction.Rebel;
-		this.BaseHitPoints = 8;
-		//this.IsBaseAbilityAvailable = true;
 		this.ResourceAvailable = 0;
 		this.AttackAvailable = 0;
 		this.ExilesAvailable = 0;
@@ -232,6 +232,35 @@ public class Player
 		Hand.Add(userCard);
 		DiscardPile.Remove(userCard);
 		return;
+    }
+
+
+
+
+	public void ChooseNewBase()
+	{
+		_consoleview.WriteLine("\nYou must select a new base.");
+		_consoleview.WriteLine("please select a card. Write \"[int]\" to chose a card");
+		
+		for (int i = 0; i < RemainingBaseCards.Count; i++)
+		{
+			_consoleview.WriteLine($"\n|{i}|{RemainingBaseCards[i].Name}|{RemainingBaseCards[i].StartingHitPoints}|{RemainingBaseCards[i].AbilityText}");
+		}
+        _consoleview.RequestUserInput(FishRemainingBasesUserchoice, "\n please select a card. Write 1, 2, 3");
+        //request integer input from console
+        //add/remove base to current base
+        //reassign base hit points
+        //
+    }
+
+    public void FishRemainingBasesUserchoice(string userChoice, Card card)
+    {
+        //check user reponse
+        int.TryParse(userChoice, out int index);
+
+        CurrentBase = RemainingBaseCards[index];
+        RemainingBaseCards.Remove(RemainingBaseCards[index]);
+        return;
     }
 
     #endregion
