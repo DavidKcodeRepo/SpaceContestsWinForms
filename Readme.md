@@ -5,9 +5,9 @@ Space Contest is a card game in a console app based off the popular concepts of 
 ## Features
 
 
- - automatic filtering for ingredients based on recipe search
- - machine-lookup to find recipes
- - conditional formatting for glancing 
+ - console-like interface with "pixel art" representations of cards
+ - 140 cards with unique abilities and lots of decisions for the players
+ - communicate over telnet with a friend (*planned feature)
 
 ## Implementation
 
